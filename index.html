@@ -2,8 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>ProQuote Manager</title>
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ProQuote">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2910/2910768.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -12,7 +21,7 @@
             colors: {
               primary: '#0f172a', // Slate 900
               secondary: '#334155', // Slate 700
-              accent: '#2563eb', // Blue 600
+              accent: '#dc2626', // Red 600 (Changed to Red as requested for branding)
             }
           }
         }
@@ -34,6 +43,10 @@
       ::-webkit-scrollbar-thumb:hover {
         background: #94a3b8; 
       }
+      /* Hide scrollbar for PWA look in some containers */
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+      }
     </style>
   <script type="importmap">
 {
@@ -47,7 +60,7 @@
 }
 </script>
 </head>
-  <body class="bg-gray-50 text-slate-900 font-sans antialiased">
+  <body class="bg-gray-50 text-slate-900 font-sans antialiased overscroll-none">
     <div id="root"></div>
   </body>
 </html>
