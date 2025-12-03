@@ -1,0 +1,5 @@
+{
+  "name": "ProQuote Manager",
+  "description": "A professional SaaS-style application for managing clients, products, and generating complex commercial budgets with specific financial logic (Kit Digital compatible) and PDF export.",
+  "requestFramePermissions": []
+}
