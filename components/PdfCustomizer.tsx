@@ -10,8 +10,10 @@ export const PdfCustomizer: React.FC = () => {
 
   // Load config on mount to ensure freshness
   useEffect(() => {
-    const loadedConfig = storageService.getPdfConfig();
-    setConfig(loadedConfig);
+    const update = () => setConfig(storageService.getPdfConfig());
+    update();
+    const unsub = storageService.subscribe(update);
+    return unsub;
   }, []);
 
   const handleSave = () => {

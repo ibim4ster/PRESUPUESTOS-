@@ -11,7 +11,10 @@ export const ProductManager: React.FC = () => {
   });
 
   useEffect(() => {
-    setProducts(storageService.getProducts());
+    const update = () => setProducts([...storageService.getProducts()]);
+    update();
+    const unsub = storageService.subscribe(update);
+    return unsub;
   }, []);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,14 +32,12 @@ export const ProductManager: React.FC = () => {
     if (!formData.description || !formData.reference) return alert('Datos incompletos');
     const prodToSave = { ...formData, id: editingId || crypto.randomUUID() };
     storageService.saveProduct(prodToSave);
-    setProducts(storageService.getProducts());
     resetForm();
   };
 
   const handleDelete = (id: string) => {
     if (confirm('¿Borrar producto?')) {
       storageService.deleteProduct(id);
-      setProducts(storageService.getProducts());
     }
   };
 

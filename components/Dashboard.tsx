@@ -30,11 +30,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget 
 
   useEffect(() => {
     loadData();
+    // Subscribe to cloud updates
+    const unsubscribe = storageService.subscribe(() => {
+        loadData();
+    });
+    return unsubscribe;
   }, []);
 
   const loadData = () => {
     const allBudgets = storageService.getBudgets();
-    setBudgets(allBudgets);
+    setBudgets([...allBudgets]); // Clone to force re-render
 
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -60,14 +65,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget 
     e.preventDefault();
     
     if(window.confirm('¿Está seguro de eliminar este presupuesto definitivamente?')) {
-      // 1. Update UI immediately for feedback
-      setBudgets(prev => prev.filter(b => b.id !== id));
-      
-      // 2. Perform actual deletion
       storageService.deleteBudget(id);
-      
-      // 3. Recalculate stats
-      setTimeout(loadData, 100);
     }
   };
 
@@ -85,7 +83,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget 
       clientSignature: undefined,
     };
     storageService.saveBudget(newBudget);
-    loadData();
   };
 
   const handleEditClick = (e: React.MouseEvent, budget: Budget) => {

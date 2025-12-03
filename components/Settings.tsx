@@ -1,18 +1,36 @@
 
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storage';
-import { CompanyProfile } from '../types';
+import { CompanyProfile, CloudConfig } from '../types';
 
 export const Settings: React.FC = () => {
   const [company, setCompany] = useState<CompanyProfile>({ name: '', cif: '', address: '', email: '', phone: '', terms: '' });
+  const [cloud, setCloud] = useState<CloudConfig>({ apiKey: '', authDomain: '', projectId: '', enabled: false });
+  const [connectionStatus, setConnectionStatus] = useState<{success?: boolean, message?: string} | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
 
   useEffect(() => {
     setCompany(storageService.getCompanyProfile());
+    setCloud(storageService.getCloudConfig());
   }, []);
 
-  const handleSave = () => {
+  const handleSaveCompany = () => {
     storageService.saveCompanyProfile(company);
     alert('Datos de empresa guardados correctamente.');
+  };
+
+  const handleSaveCloud = () => {
+    storageService.saveCloudConfig(cloud);
+    alert('Configuración guardada. Realiza la prueba de conexión para verificar.');
+    setConnectionStatus(null);
+  };
+
+  const handleTestConnection = async () => {
+      setIsTesting(true);
+      setConnectionStatus(null);
+      const result = await storageService.testConnection();
+      setConnectionStatus(result);
+      setIsTesting(false);
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,63 +64,126 @@ export const Settings: React.FC = () => {
 
   return (
     <div className="space-y-8 pb-12">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-primary">Configuración de Empresa</h2>
-          <p className="text-slate-500">Gestiona los datos fiscales y copias de seguridad.</p>
-        </div>
-        <button onClick={handleSave} className="bg-accent text-white px-6 py-2 rounded shadow hover:bg-blue-600 font-medium">
-          Guardar Datos
-        </button>
-      </div>
+      <h2 className="text-2xl font-bold text-primary">Configuración Global</h2>
+
+      {/* Cloud Sync */}
+      <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+         <div className="flex justify-between items-start mb-4 border-b pb-2">
+            <div>
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    ☁️ Sincronización en la Nube (Google Firebase)
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                    Conecta esta app a tu cuenta de Google para tener los mismos datos en PC y Móvil.
+                </p>
+            </div>
+            <div className="flex items-center gap-2">
+                <span className={`text-xs font-bold ${cloud.enabled ? 'text-green-600' : 'text-slate-400'}`}>
+                    {cloud.enabled ? 'ACTIVADO' : 'DESACTIVADO'}
+                </span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" checked={cloud.enabled} onChange={e => setCloud({...cloud, enabled: e.target.checked})} />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+            </div>
+         </div>
+
+         {cloud.enabled && (
+             <div className="space-y-4 animate-in fade-in slide-in-from-top-4">
+                 
+                 {/* Status Indicator */}
+                 {connectionStatus && (
+                     <div className={`p-4 rounded text-sm border ${connectionStatus.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                         <strong className="block mb-1">{connectionStatus.success ? '✅ Conexión Exitosa' : '❌ Error de Conexión'}</strong>
+                         {connectionStatus.message}
+                     </div>
+                 )}
+
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div>
+                         <label className="block text-xs font-bold text-slate-500 mb-1">API Key</label>
+                         <input className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900 font-mono text-xs" 
+                            placeholder="AIzaSy..." 
+                            value={cloud.apiKey} onChange={e => setCloud({...cloud, apiKey: e.target.value})} 
+                         />
+                     </div>
+                     <div>
+                         <label className="block text-xs font-bold text-slate-500 mb-1">Auth Domain</label>
+                         <input className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900 font-mono text-xs" 
+                            placeholder="proyecto.firebaseapp.com" 
+                            value={cloud.authDomain} onChange={e => setCloud({...cloud, authDomain: e.target.value})} 
+                         />
+                     </div>
+                     <div>
+                         <label className="block text-xs font-bold text-slate-500 mb-1">Project ID</label>
+                         <input className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900 font-mono text-xs" 
+                            placeholder="proyecto-id" 
+                            value={cloud.projectId} onChange={e => setCloud({...cloud, projectId: e.target.value})} 
+                         />
+                     </div>
+                 </div>
+                 
+                 <div className="flex gap-4 mt-4 border-t pt-4">
+                    <button onClick={handleSaveCloud} className="bg-slate-800 text-white px-4 py-2 rounded text-sm font-bold hover:bg-slate-900">
+                        Guardar Configuración
+                    </button>
+                    <button 
+                        onClick={handleTestConnection} 
+                        disabled={isTesting}
+                        className={`px-4 py-2 rounded text-sm font-bold border ${isTesting ? 'bg-gray-100 text-gray-400' : 'bg-white border-blue-600 text-blue-600 hover:bg-blue-50'}`}
+                    >
+                        {isTesting ? 'Probando...' : '🔍 Probar Conexión'}
+                    </button>
+                 </div>
+             </div>
+         )}
+      </section>
 
       {/* Company Data */}
       <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <h3 className="text-lg font-bold mb-4 border-b pb-2 text-slate-800">Datos Fiscales y de Contacto</h3>
+        <div className="flex justify-between items-center mb-4 border-b pb-2">
+            <h3 className="text-lg font-bold text-slate-800">Datos Fiscales de la Empresa</h3>
+            <button onClick={handleSaveCompany} className="bg-slate-900 text-white px-4 py-2 rounded text-sm font-medium hover:bg-slate-700">
+              Guardar Cambios
+            </button>
+        </div>
+        
         <div className="flex flex-col md:flex-row gap-6">
           <div className="w-full md:w-1/4">
-             <label className="block text-sm font-medium mb-2 text-slate-700">Logo Empresa</label>
+             <label className="block text-sm font-medium mb-2 text-slate-700">Logo</label>
              <div className="border-2 border-dashed border-gray-300 rounded-lg h-32 flex items-center justify-center bg-gray-50 relative overflow-hidden group">
                {company.logo ? (
-                 <img src={company.logo} className="absolute inset-0 w-full h-full object-contain p-2" alt="Company Logo" />
+                 <img src={company.logo} className="absolute inset-0 w-full h-full object-contain p-2" alt="Logo" />
                ) : (
-                 <div className="text-center p-4">
-                   <svg className="mx-auto h-8 w-8 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                     <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                   </svg>
-                   <span className="text-xs text-slate-500">Subir Logo</span>
-                 </div>
+                 <span className="text-xs text-slate-500">Subir Logo</span>
                )}
                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleLogoUpload} accept="image/*" />
-               <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                 <span className="text-white text-xs font-bold">Cambiar</span>
-               </div>
              </div>
           </div>
           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">Razón Social / Nombre</label>
-              <input className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900 focus:ring-2 focus:ring-accent outline-none" placeholder="Ej: Mi Empresa S.L." value={company.name} onChange={e => setCompany({...company, name: e.target.value})} />
+              <label className="block text-xs font-bold text-slate-500 mb-1">Razón Social</label>
+              <input className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900" value={company.name} onChange={e => setCompany({...company, name: e.target.value})} />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1">CIF / NIF</label>
-              <input className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900 focus:ring-2 focus:ring-accent outline-none" placeholder="Ej: B12345678" value={company.cif} onChange={e => setCompany({...company, cif: e.target.value})} />
+              <input className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900" value={company.cif} onChange={e => setCompany({...company, cif: e.target.value})} />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">Email de Contacto</label>
-              <input className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900 focus:ring-2 focus:ring-accent outline-none" placeholder="info@miempresa.com" value={company.email} onChange={e => setCompany({...company, email: e.target.value})} />
+              <label className="block text-xs font-bold text-slate-500 mb-1">Email</label>
+              <input className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900" value={company.email} onChange={e => setCompany({...company, email: e.target.value})} />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1">Teléfono</label>
-              <input className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900 focus:ring-2 focus:ring-accent outline-none" placeholder="900 000 000" value={company.phone} onChange={e => setCompany({...company, phone: e.target.value})} />
+              <input className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900" value={company.phone} onChange={e => setCompany({...company, phone: e.target.value})} />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-500 mb-1">Dirección Completa</label>
-              <textarea className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900 focus:ring-2 focus:ring-accent outline-none resize-none h-20" placeholder="Calle, Número, CP, Ciudad..." value={company.address} onChange={e => setCompany({...company, address: e.target.value})} />
+              <label className="block text-xs font-bold text-slate-500 mb-1">Dirección</label>
+              <textarea className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900 h-20 resize-none" value={company.address} onChange={e => setCompany({...company, address: e.target.value})} />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-500 mb-1">Términos Legales por Defecto</label>
-              <textarea className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900 focus:ring-2 focus:ring-accent outline-none h-24" placeholder="Estos términos aparecerán al principio de la sección legal en el PDF..." value={company.terms} onChange={e => setCompany({...company, terms: e.target.value})} />
+              <label className="block text-xs font-bold text-slate-500 mb-1">Términos Legales (Defecto)</label>
+              <textarea className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900 h-20 resize-none" value={company.terms} onChange={e => setCompany({...company, terms: e.target.value})} />
             </div>
           </div>
         </div>
@@ -110,24 +191,17 @@ export const Settings: React.FC = () => {
 
       {/* Backup */}
       <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <h3 className="text-lg font-bold mb-4 border-b pb-2 text-slate-800">Copia de Seguridad</h3>
-        <p className="text-sm text-slate-500 mb-4">Exporta todos tus datos (clientes, productos, historial) a un archivo seguro o restaura una copia anterior.</p>
+        <h3 className="text-lg font-bold mb-4 border-b pb-2 text-slate-800">Copia de Seguridad Manual</h3>
         <div className="flex gap-4">
-          <button onClick={handleBackup} className="bg-slate-700 text-white px-4 py-2 rounded hover:bg-slate-800 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Exportar Backup
+          <button onClick={handleBackup} className="bg-slate-200 text-slate-800 px-4 py-2 rounded text-sm font-medium hover:bg-slate-300">
+            ⬇ Exportar JSON
           </button>
-          <label className="bg-slate-200 text-slate-800 px-4 py-2 rounded hover:bg-slate-300 cursor-pointer flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Importar Backup
+          <label className="bg-slate-200 text-slate-800 px-4 py-2 rounded text-sm font-medium hover:bg-slate-300 cursor-pointer">
+            ⬆ Importar JSON
             <input type="file" accept=".json" className="hidden" onChange={handleRestore} />
           </label>
         </div>
       </section>
-      
-      <div className="text-center text-xs text-slate-400 mt-8">
-        <p>Para configurar el aspecto visual de los documentos, vaya a la sección <strong>Personalizar PDF</strong> en el menú lateral.</p>
-      </div>
     </div>
   );
 };

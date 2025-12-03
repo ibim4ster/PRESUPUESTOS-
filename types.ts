@@ -94,6 +94,13 @@ export interface PdfConfig {
   };
 }
 
+export interface CloudConfig {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  enabled: boolean;
+}
+
 export const DEFAULT_LEGAL_TEXTS = [
   { id: 'tax', text: 'Impuestos indirectos no incluidos.' },
   { id: 'connectivity', text: 'El cliente debe disponer de conexión a internet para soporte remoto.' },

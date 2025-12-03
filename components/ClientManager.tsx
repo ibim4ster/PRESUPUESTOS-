@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storage';
 import { Client } from '../types';
@@ -12,7 +13,10 @@ export const ClientManager: React.FC = () => {
   });
 
   useEffect(() => {
-    setClients(storageService.getClients());
+    const update = () => setClients([...storageService.getClients()]);
+    update();
+    const unsub = storageService.subscribe(update);
+    return unsub;
   }, []);
 
   const handleSave = () => {
@@ -20,14 +24,12 @@ export const ClientManager: React.FC = () => {
     
     const clientToSave = { ...formData, id: editingId || crypto.randomUUID() };
     storageService.saveClient(clientToSave);
-    setClients(storageService.getClients());
     resetForm();
   };
 
   const handleDelete = (id: string) => {
     if (confirm('¿Borrar cliente?')) {
       storageService.deleteClient(id);
-      setClients(storageService.getClients());
     }
   };
 
