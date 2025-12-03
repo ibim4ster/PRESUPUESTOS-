@@ -1,10 +1,13 @@
 
+export type SystemType = 'agora' | 'sage';
+
 export interface Product {
   id: string;
   reference: string;
   description: string;
   price: number;
   image?: string; // Base64
+  system: 'agora' | 'sage' | 'both'; // New field to filter catalog
 }
 
 export interface Client {
@@ -39,6 +42,8 @@ export interface Budget {
   clientData: Client; // Snapshot of client data at time of creation
   validityDays: number;
   
+  system: SystemType; // New field to distinguish budgets
+
   lineItems: LineItem[];
   
   // Financials
@@ -66,8 +71,14 @@ export interface CustomLegalText {
 }
 
 export interface PdfConfig {
-  primaryColor: string; // Main Brand Color
-  secondaryColor: string; // Header Backgrounds
+  // Ágora Theme
+  primaryColor: string; 
+  secondaryColor: string; 
+
+  // Sage 50 Theme
+  sagePrimaryColor: string;
+  sageSecondaryColor: string;
+
   headingFont: string;
   bodyFont: string;
   
@@ -91,7 +102,7 @@ export interface PdfConfig {
     agora?: string;
     concord?: string;
     cashloogy?: string;
-    logic?: string;
+    // Logic removed
   };
 }
 

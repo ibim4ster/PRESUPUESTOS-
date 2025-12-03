@@ -19,7 +19,6 @@ export const PdfCustomizer: React.FC = () => {
   const handleSave = () => {
     if (config) {
       storageService.savePdfConfig(config);
-      // Small visual feedback could be added here, but alert is robust
       alert('¡Diseño guardado correctamente! Los próximos PDFs usarán esta configuración.');
     }
   };
@@ -80,7 +79,7 @@ export const PdfCustomizer: React.FC = () => {
            <h2 className="text-2xl font-bold text-primary">Personalizador de PDF</h2>
            <p className="text-slate-500">Diseña la apariencia de tus presupuestos.</p>
         </div>
-        <button onClick={handleSave} className="bg-accent text-white px-6 py-3 rounded-lg shadow hover:bg-blue-600 flex items-center gap-2 font-bold transition-colors">
+        <button onClick={handleSave} className="bg-slate-900 text-white px-6 py-3 rounded-lg shadow hover:bg-slate-800 flex items-center gap-2 font-bold transition-colors">
            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
            GUARDAR DISEÑO
         </button>
@@ -91,7 +90,10 @@ export const PdfCustomizer: React.FC = () => {
         {/* Column 1: Branding & Colors */}
         <div className="space-y-6">
            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <h3 className="font-bold text-slate-800 mb-4 border-b pb-2">Colores y Marca</h3>
+              <h3 className="font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-2">
+                 <span className="w-3 h-3 bg-red-600 rounded-full"></span>
+                 Colores ÁGORA
+              </h3>
               <div className="space-y-4">
                  <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">Color Principal (Barra Superior y Totales)</label>
@@ -105,10 +107,30 @@ export const PdfCustomizer: React.FC = () => {
                        <input type="color" className="h-10 w-full rounded border-gray-200 cursor-pointer" value={config.secondaryColor} onChange={e => setConfig({...config, secondaryColor: e.target.value})} />
                     </div>
                  </div>
+              </div>
+
+              <h3 className="font-bold text-slate-800 mb-4 mt-8 border-b pb-2 flex items-center gap-2">
+                 <span className="w-3 h-3 bg-black rounded-full"></span>
+                 Colores SAGE 50
+              </h3>
+              <div className="space-y-4">
                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Texto del Título (H1)</label>
-                    <input className="w-full border border-gray-300 rounded text-sm p-2 bg-white text-slate-900 focus:ring-2 focus:ring-accent outline-none" value={config.titleText} onChange={e => setConfig({...config, titleText: e.target.value})} />
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Color Principal (Negro)</label>
+                    <div className="flex items-center gap-2">
+                       <input type="color" className="h-10 w-full rounded border-gray-200 cursor-pointer" value={config.sagePrimaryColor} onChange={e => setConfig({...config, sagePrimaryColor: e.target.value})} />
+                    </div>
                  </div>
+                 <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Color Secundario (Verde)</label>
+                    <div className="flex items-center gap-2">
+                       <input type="color" className="h-10 w-full rounded border-gray-200 cursor-pointer" value={config.sageSecondaryColor} onChange={e => setConfig({...config, sageSecondaryColor: e.target.value})} />
+                    </div>
+                 </div>
+              </div>
+
+              <div className="mt-6 border-t pt-4">
+                 <label className="block text-xs font-bold text-slate-500 mb-1">Texto del Título (H1)</label>
+                 <input className="w-full border border-gray-300 rounded text-sm p-2 bg-white text-slate-900 focus:ring-2 focus:ring-accent outline-none" value={config.titleText} onChange={e => setConfig({...config, titleText: e.target.value})} />
               </div>
            </div>
 
@@ -224,7 +246,7 @@ export const PdfCustomizer: React.FC = () => {
            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full">
               <h3 className="font-bold text-slate-800 mb-4 border-b pb-2">Logos Footer (Partners)</h3>
               <div className="space-y-6">
-                 {['agora', 'concord', 'cashloogy', 'logic'].map(p => (
+                 {['agora', 'concord', 'cashloogy'].map(p => (
                    <div key={p}>
                       <label className="block text-xs font-bold uppercase mb-2 text-slate-500 tracking-wider">{p}</label>
                       <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 flex flex-col items-center gap-3 bg-gray-50 hover:bg-gray-100 transition-colors relative group">

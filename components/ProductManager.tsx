@@ -7,8 +7,9 @@ export const ProductManager: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Product>({
-    id: '', reference: '', description: '', price: 0, image: ''
+    id: '', reference: '', description: '', price: 0, image: '', system: 'both'
   });
+  const [filter, setFilter] = useState<'all' | 'agora' | 'sage'>('all');
 
   useEffect(() => {
     const update = () => setProducts([...storageService.getProducts()]);
@@ -48,12 +49,24 @@ export const ProductManager: React.FC = () => {
 
   const resetForm = () => {
     setEditingId(null);
-    setFormData({ id: '', reference: '', description: '', price: 0, image: '' });
+    setFormData({ id: '', reference: '', description: '', price: 0, image: '', system: 'both' });
   };
+
+  const filteredProducts = products.filter(p => {
+    if (filter === 'all') return true;
+    return p.system === filter || p.system === 'both' || !p.system;
+  });
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-primary">Catálogo de Productos</h2>
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-primary">Catálogo de Productos</h2>
+        <div className="flex bg-white rounded-lg border border-gray-200 overflow-hidden">
+             <button onClick={() => setFilter('all')} className={`px-3 py-1 text-xs font-bold ${filter === 'all' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Todos</button>
+             <button onClick={() => setFilter('agora')} className={`px-3 py-1 text-xs font-bold ${filter === 'agora' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Ágora</button>
+             <button onClick={() => setFilter('sage')} className={`px-3 py-1 text-xs font-bold ${filter === 'sage' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Sage</button>
+        </div>
+      </div>
 
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-6">
         <div className="flex-1 space-y-4">
@@ -79,6 +92,23 @@ export const ProductManager: React.FC = () => {
                 onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})} 
               />
             </div>
+            <div className="col-span-2">
+                <label className="block text-xs font-bold text-slate-500 mb-1">Sistema Asignado</label>
+                <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="system" checked={formData.system === 'both'} onChange={() => setFormData({...formData, system: 'both'})} />
+                        <span className="text-sm">Ambos</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="system" checked={formData.system === 'agora'} onChange={() => setFormData({...formData, system: 'agora'})} />
+                        <span className="text-sm">Solo Ágora</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="system" checked={formData.system === 'sage'} onChange={() => setFormData({...formData, system: 'sage'})} />
+                        <span className="text-sm">Solo Sage 50</span>
+                    </label>
+                </div>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">Descripción</label>
@@ -91,7 +121,7 @@ export const ProductManager: React.FC = () => {
           </div>
           <div className="flex justify-end space-x-2 pt-2">
             {editingId && <button onClick={resetForm} className="px-4 py-2 text-slate-500 hover:text-slate-700">Cancelar</button>}
-            <button onClick={handleSave} className="bg-accent text-white px-6 py-2 rounded shadow hover:bg-blue-600 font-medium">
+            <button onClick={handleSave} className="bg-slate-900 text-white px-6 py-2 rounded shadow hover:bg-slate-800 font-medium">
               {editingId ? 'Actualizar' : 'Guardar Producto'}
             </button>
           </div>
@@ -111,15 +141,18 @@ export const ProductManager: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {products.map(p => (
-          <div key={p.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex space-x-4 hover:shadow-md transition-shadow">
+        {filteredProducts.map(p => (
+          <div key={p.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex space-x-4 hover:shadow-md transition-shadow relative">
+            <span className={`absolute top-2 right-2 text-[10px] uppercase font-bold px-1.5 rounded text-white ${p.system === 'sage' ? 'bg-[#00d061]' : p.system === 'agora' ? 'bg-red-500' : 'bg-slate-400'}`}>
+                {p.system === 'both' ? 'AMBOS' : p.system}
+            </span>
             <div className="w-16 h-16 bg-gray-50 rounded flex-shrink-0 flex items-center justify-center overflow-hidden border border-gray-100">
               {p.image ? <img src={p.image} className="w-full h-full object-cover" /> : <span className="text-xl">📦</span>}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-bold text-slate-800 truncate">{p.reference}</div>
+              <div className="font-bold text-slate-800 truncate pr-6">{p.reference}</div>
               <div className="text-sm text-slate-500 truncate" title={p.description}>{p.description}</div>
-              <div className="font-mono text-accent font-bold mt-1">{p.price.toFixed(2)} €</div>
+              <div className="font-mono text-slate-800 font-bold mt-1">{p.price.toFixed(2)} €</div>
             </div>
             <div className="flex flex-col space-y-2 justify-center">
               <button onClick={() => handleEdit(p)} className="text-xs bg-slate-100 p-1.5 rounded hover:bg-slate-200 text-slate-600" title="Editar">✏️</button>

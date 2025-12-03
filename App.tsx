@@ -7,11 +7,12 @@ import { ProductManager } from './components/ProductManager';
 import { Settings } from './components/Settings';
 import { BudgetEditor } from './components/BudgetEditor';
 import { PdfCustomizer } from './components/PdfCustomizer';
-import { Budget } from './types';
+import { Budget, SystemType } from './types';
 import { storageService } from './services/storage';
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard');
+  const [currentSystem, setCurrentSystem] = useState<SystemType>('agora');
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
 
   useEffect(() => {
@@ -42,9 +43,18 @@ function App() {
   };
 
   return (
-    <Layout activeView={currentView} onNavigate={navigate}>
+    <Layout 
+      activeView={currentView} 
+      onNavigate={navigate}
+      currentSystem={currentSystem}
+      onSystemChange={setCurrentSystem}
+    >
       {currentView === 'dashboard' && (
-        <Dashboard onEditBudget={handleEditBudget} onNewBudget={handleNewBudget} />
+        <Dashboard 
+          onEditBudget={handleEditBudget} 
+          onNewBudget={handleNewBudget} 
+          currentSystem={currentSystem}
+        />
       )}
       
       {currentView === 'clients' && <ClientManager />}
@@ -59,7 +69,8 @@ function App() {
       {(currentView === 'edit-budget' || currentView === 'budgets') && (
         <BudgetEditor 
           initialBudget={editingBudget} 
-          onClose={handleCloseEditor} 
+          onClose={handleCloseEditor}
+          currentSystem={currentSystem}
         />
       )}
     </Layout>

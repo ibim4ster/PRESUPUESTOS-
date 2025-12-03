@@ -1,5 +1,5 @@
 
-import { Budget, Client, CompanyProfile, PdfConfig, Product, CloudConfig } from '../types';
+import { Budget, Client, CompanyProfile, PdfConfig, Product, CloudConfig, SystemType } from '../types';
 import { initializeApp, getApps, deleteApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc, getDoc } from 'firebase/firestore';
 
@@ -10,17 +10,15 @@ const KEYS = {
   COMPANY: 'proquote_company',
   PDF_CONFIG: 'proquote_pdf_config',
   CLOUD_CONFIG: 'proquote_cloud_config',
-  INIT: 'proquote_initialized_v3' // Updated version to force seed
+  INIT: 'proquote_initialized_v4' // Bumped version
 };
 
 // --- LOGOS PRE-CARGADOS (SVG BASE64) ---
-// Estos logos se cargan por defecto si no hay configuración
 const LOGO_AGORA = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgNDAiPjx0ZXh0IHk9IjMwIiB4PSI1MCIgZmlsbD0iI2UzMDYxMyIgZm9udC1mYW1pbHk9ImFyaWFsIiBmb250LXdlaWdodD0iYm9sZCIgZm9udC1zaXplPSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+w6Fnb3JhPC90ZXh0Pjwvc3ZnPg==";
 const LOGO_CONCORD = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgNDAiPjx0ZXh0IHk9IjMwIiB4PSI1MCIgZmlsbD0iIzAwOTYzOSIgZm9udC1mYW1pbHk9ImFyaWFsIiBmb250LXdlaWdodD0iYm9sZCIgZm9udC1zaXplPSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Y29uY29yZDwvdGV4dD48L3N2Zz4=";
 const LOGO_CASHLOGY = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNTAgNDAiPjx0ZXh0IHk9IjMwIiB4PSI3NSIgZmlsbD0iI2ZmY2QwMCIgZm9udC1mYW1pbHk9ImFyaWFsIiBmb250LXdlaWdodD0iYm9sZCIgZm9udC1zaXplPSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Y2FzaGxvZ3k8L3RleHQ+PC9zdmc+";
-const LOGO_LOGIC = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgNDAiPjx0ZXh0IHk9IjMwIiB4PSI1MCIgZmlsbD0iI2QwMTAxMCIgZm9udC1mYW1pbHk9ImFyaWFsIiBmb250LXdlaWdodD0iYm9sZCIgZm9udC1zaXplPSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+TE9HSUM8L3RleHQ+PC9zdmc+";
 
-// TUS CLAVES DE FIREBASE (Configuradas por defecto y forzadas)
+// TUS CLAVES DE FIREBASE
 const DEFAULT_CLOUD_CONFIG: CloudConfig = {
   apiKey: "AIzaSyA2PFM21gHn2840SZQ0Bk4tAbM0LxF3ADM",
   authDomain: "presupuestos-93a99.firebaseapp.com",
@@ -28,12 +26,11 @@ const DEFAULT_CLOUD_CONFIG: CloudConfig = {
   enabled: true
 };
 
-// Event System for Reactivity
+// Event System
 type Listener = () => void;
 const listeners: Listener[] = [];
 const notify = () => listeners.forEach(l => l());
 
-// Generic helper
 const saveLocal = (key: string, data: any) => {
   try {
     localStorage.setItem(key, JSON.stringify(data));
@@ -56,17 +53,13 @@ let db: any = null;
 let unsubscribeFunctions: Function[] = [];
 
 const initFirebase = async () => {
-  // Always use the hardcoded config to ensure sync between devices
-  // unless user explicitly disabled it, but we default to enabled.
   let config = loadLocal<CloudConfig>(KEYS.CLOUD_CONFIG, DEFAULT_CLOUD_CONFIG);
   
-  // Force update keys if they are missing or old default
   if (!config.apiKey || config.projectId !== "presupuestos-93a99") {
       config = DEFAULT_CLOUD_CONFIG;
       saveLocal(KEYS.CLOUD_CONFIG, config);
   }
   
-  // Cleanup previous connections
   unsubscribeFunctions.forEach(unsub => unsub());
   unsubscribeFunctions = [];
   
@@ -74,13 +67,11 @@ const initFirebase = async () => {
 
   try {
     if (getApps().length > 0) {
-      // Check if existing app matches config
       const existingApp = getApps()[0];
       if (existingApp.options.apiKey !== config.apiKey) {
           await deleteApp(existingApp);
       } else {
           db = getFirestore(existingApp);
-           // Start Listeners if DB already exists
           startSync('budgets', KEYS.BUDGETS);
           startSync('clients', KEYS.CLIENTS);
           startSync('products', KEYS.PRODUCTS);
@@ -96,7 +87,6 @@ const initFirebase = async () => {
     db = getFirestore(app);
     console.log("🔥 Firebase Connected to", config.projectId);
     
-    // Start Listeners
     startSync('budgets', KEYS.BUDGETS);
     startSync('clients', KEYS.CLIENTS);
     startSync('products', KEYS.PRODUCTS);
@@ -109,18 +99,15 @@ const initFirebase = async () => {
 const startSync = (collectionName: string, localKey: string) => {
   if (!db) return;
   
-  // Real-time listener: Cloud -> Local
   const unsub = onSnapshot(collection(db, collectionName), (snapshot) => {
     const cloudData: any[] = [];
     snapshot.forEach(doc => cloudData.push(doc.data()));
     
-    // Merge Strategy: Cloud is source of truth when connected
     if (cloudData.length > 0) {
         saveLocal(localKey, cloudData);
-        notify(); // Tell React components to re-render immediately
+        notify();
         console.log(`☁️ Synced ${collectionName} from cloud (${cloudData.length} items)`);
     } else {
-        // If cloud is empty but we have local data (first sync), push local to cloud
         const localData = loadLocal<any[]>(localKey, []);
         if (localData.length > 0) {
             console.log(`☁️ Initial push for ${collectionName}`);
@@ -162,32 +149,32 @@ export const storageService = {
     };
   },
 
-  // Initialization / Seeding
   checkAndSeedData: () => {
     const initVersion = localStorage.getItem(KEYS.INIT);
-    
-    // Ensure Firebase inits
     initFirebase();
 
-    // Force update of Logos if v3 not present
-    if (initVersion !== 'proquote_initialized_v3') {
+    if (initVersion !== 'proquote_initialized_v4') {
         const currentPdfConfig = loadLocal<PdfConfig>(KEYS.PDF_CONFIG, {
-            primaryColor: '#dc2626', secondaryColor: '#f8fafc', headingFont: 'helvetica', bodyFont: 'helvetica',
+            primaryColor: '#dc2626', secondaryColor: '#f8fafc',
+            sagePrimaryColor: '#000000', sageSecondaryColor: '#e6ffef', // SAGE DEFAULTS
+            headingFont: 'helvetica', bodyFont: 'helvetica',
             showLogo: true, showCompanyDetails: true, showImages: true, showLegal: true, showSignatures: true, showPageNumbers: true, showQr: false,
             titleText: 'PRESUPUESTO', footerText: 'Gracias por su confianza.',
             legalTextIds: ['tax', 'payment'], customLegalTexts: [], partnerLogos: {}
         });
 
-        // Seed logos
+        // Seed logos (Removed Logic)
         currentPdfConfig.partnerLogos = {
             agora: LOGO_AGORA,
             concord: LOGO_CONCORD,
-            cashloogy: LOGO_CASHLOGY,
-            logic: LOGO_LOGIC
+            cashloogy: LOGO_CASHLOGY
         };
+        // Add sage defaults if missing
+        if(!currentPdfConfig.sagePrimaryColor) currentPdfConfig.sagePrimaryColor = '#000000';
+        if(!currentPdfConfig.sageSecondaryColor) currentPdfConfig.sageSecondaryColor = '#e6ffef';
+
         saveLocal(KEYS.PDF_CONFIG, currentPdfConfig);
         
-        // Seed default clients/products if empty
         if (!loadLocal(KEYS.CLIENTS, null)) {
              const mockClients: Client[] = [
                 { id: '1', commercialName: 'Restaurante El Puerto', legalName: 'Gastronomía del Mar S.L.', cif: 'B12345678', address: 'Av. Marítima 45, Valencia', email: 'info@elpuerto.com', phone: '960123456', paymentMethod: 'Transferencia' }
@@ -195,14 +182,12 @@ export const storageService = {
             saveLocal(KEYS.CLIENTS, mockClients);
         }
 
-        localStorage.setItem(KEYS.INIT, 'proquote_initialized_v3');
+        localStorage.setItem(KEYS.INIT, 'proquote_initialized_v4');
     }
   },
 
-  // Connection Diagnostic Tool
   testConnection: async (): Promise<{success: boolean, message: string}> => {
       if (!db) return { success: false, message: "Iniciando Firebase..." };
-      
       try {
           const testRef = doc(db, '_connection_test', 'test');
           await setDoc(testRef, { timestamp: new Date().toISOString() });
@@ -237,9 +222,11 @@ export const storageService = {
     notify();
   },
 
-  getNextBudgetNumber: (): string => {
+  getNextBudgetNumber: (system: SystemType): string => {
     const budgets = storageService.getBudgets();
     const year = new Date().getFullYear();
+    // Use system specific prefix? User asked for "Different budgets", kept it simple shared numbering per year
+    // but we can make it distinct if needed. Let's make it PRE-{YEAR}-... for all for continuity unless asked.
     const prefix = `PRE-${year}-`;
     const numbers = budgets
       .map(b => b.number)
@@ -290,7 +277,9 @@ export const storageService = {
   saveCompanyProfile: (profile: CompanyProfile) => saveLocal(KEYS.COMPANY, profile),
 
   getPdfConfig: () => loadLocal<PdfConfig>(KEYS.PDF_CONFIG, {
-    primaryColor: '#dc2626', secondaryColor: '#f8fafc', headingFont: 'helvetica', bodyFont: 'helvetica',
+    primaryColor: '#dc2626', secondaryColor: '#f8fafc',
+    sagePrimaryColor: '#000000', sageSecondaryColor: '#e6ffef',
+    headingFont: 'helvetica', bodyFont: 'helvetica',
     showLogo: true, showCompanyDetails: true, showImages: true, showLegal: true, showSignatures: true, showPageNumbers: true, showQr: false,
     titleText: 'PRESUPUESTO', footerText: 'Gracias por su confianza.',
     legalTextIds: ['tax', 'payment'], customLegalTexts: [], partnerLogos: {}

@@ -1,10 +1,13 @@
 
 import React, { useState } from 'react';
+import { SystemType } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
   activeView: string;
   onNavigate: (view: string) => void;
+  currentSystem: SystemType;
+  onSystemChange: (system: SystemType) => void;
 }
 
 // Icons components
@@ -22,7 +25,7 @@ const NavItem = ({ id, label, icon: Icon, active, onClick }: any) => (
     onClick={() => onClick(id)}
     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
       active 
-        ? 'bg-accent text-white shadow-lg translate-x-1' 
+        ? 'bg-white/10 text-white shadow-sm' 
         : 'text-slate-400 hover:bg-slate-800 hover:text-white'
     }`}
   >
@@ -31,7 +34,7 @@ const NavItem = ({ id, label, icon: Icon, active, onClick }: any) => (
   </button>
 );
 
-export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate, currentSystem, onSystemChange }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleNavClick = (view: string) => {
@@ -39,13 +42,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate
     setIsMobileMenuOpen(false); // Close menu on selection
   };
 
+  const isSage = currentSystem === 'sage';
+  const themeColor = isSage ? 'bg-black' : 'bg-slate-900';
+  const accentColor = isSage ? 'bg-[#00d061]' : 'bg-red-600';
+  const accentText = isSage ? 'text-[#00d061]' : 'text-red-500';
+
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-slate-900 text-white z-30 flex items-center justify-between px-4 shadow-md">
+      <div className={`lg:hidden fixed top-0 left-0 right-0 h-16 ${themeColor} text-white z-30 flex items-center justify-between px-4 shadow-md transition-colors duration-300`}>
         <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-white text-lg font-bold">P</div>
+            <div className={`w-8 h-8 ${accentColor} rounded-lg flex items-center justify-center text-white text-lg font-bold`}>P</div>
             <span className="font-bold text-lg">ProQuote</span>
         </div>
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2">
@@ -63,15 +71,30 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate
 
       {/* Sidebar */}
       <aside className={`
-        fixed lg:static inset-y-0 left-0 w-64 bg-slate-900 text-white flex flex-col flex-shrink-0 shadow-2xl z-40 transition-transform duration-300 ease-in-out
+        fixed lg:static inset-y-0 left-0 w-64 ${themeColor} text-white flex flex-col flex-shrink-0 shadow-2xl z-40 transition-all duration-300 ease-in-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-        <div className="p-6 border-b border-slate-800 bg-slate-950 hidden lg:block">
+        <div className="p-6 border-b border-white/10">
           <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-white text-lg">P</div>
+            <div className={`w-8 h-8 ${accentColor} rounded-lg flex items-center justify-center text-white text-lg transition-colors duration-300`}>P</div>
             <span>ProQuote</span>
           </h1>
-          <p className="text-xs text-slate-500 mt-1 ml-10">Manager v2.0</p>
+          
+          {/* System Switcher */}
+          <div className="mt-6 bg-black/30 p-1 rounded-lg flex">
+             <button 
+                onClick={() => onSystemChange('agora')}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${!isSage ? 'bg-red-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+             >
+                ÁGORA
+             </button>
+             <button 
+                onClick={() => onSystemChange('sage')}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${isSage ? 'bg-[#00d061] text-black shadow' : 'text-slate-400 hover:text-white'}`}
+             >
+                SAGE 50
+             </button>
+          </div>
         </div>
         
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto mt-16 lg:mt-0">
@@ -119,14 +142,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate
           />
         </nav>
 
-        <div className="p-4 border-t border-slate-800 bg-slate-950">
+        <div className="p-4 border-t border-white/10">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold ring-2 ring-slate-600">
+            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold ring-2 ring-white/20">
               PQ
             </div>
             <div className="text-sm">
-              <div className="font-medium text-slate-200">Usuario</div>
-              <div className="text-slate-500 text-xs">Administrador</div>
+              <div className="font-medium text-slate-200">Sistema Activo</div>
+              <div className={`text-xs ${accentText} font-bold uppercase`}>{isSage ? 'Sage 50' : 'Ágora'}</div>
             </div>
           </div>
         </div>

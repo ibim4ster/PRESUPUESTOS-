@@ -22,7 +22,13 @@ export const generateBudgetPdf = (
     ] : [0, 0, 0];
   };
 
-  const primaryRgb = hexToRgb(config.primaryColor);
+  // Determine colors based on system
+  const isSage = budget.system === 'sage';
+  const primaryColorHex = isSage ? config.sagePrimaryColor || '#000000' : config.primaryColor;
+  const secondaryColorHex = isSage ? config.sageSecondaryColor || '#e6ffef' : config.secondaryColor;
+
+  const primaryRgb = hexToRgb(primaryColorHex);
+  const secondaryRgb = hexToRgb(secondaryColorHex);
   
   // --- HEADER DESIGN ---
   // Top Color Bar
@@ -135,7 +141,7 @@ export const generateBudgetPdf = (
         colSpan: config.showImages ? 5 : 4, 
         styles: { 
           fontStyle: 'bold' as const, 
-          fillColor: [245, 245, 245], 
+          fillColor: secondaryRgb, // Use secondary theme color for sections
           textColor: primaryRgb,
           halign: 'left' as const,
           cellPadding: { top: 3, bottom: 3, left: 5 }
@@ -199,7 +205,6 @@ export const generateBudgetPdf = (
             }
         }
     },
-    // Alternate Row Colors manually for cleaner look
     didParseCell: (data) => {
         if (data.section === 'body' && data.row.index % 2 === 0 && data.row.cells[0].raw && typeof data.row.cells[0].raw === 'object') {
            // Skip styling for sections as they are already styled
@@ -228,7 +233,6 @@ export const generateBudgetPdf = (
   // Fix: use any casting to access lastAutoTable which is added by the plugin
   let finalY = (doc as any).lastAutoTable.finalY + 10;
   
-  // Ensure space for totals
   if (finalY > pageHeight - 60) {
     doc.addPage();
     finalY = 20;
@@ -267,7 +271,6 @@ export const generateBudgetPdf = (
 
   // --- TERMS & LEGAL ---
   if (config.showLegal) {
-      // Check space
       if (finalY > pageHeight - 80) {
           doc.addPage();
           finalY = 20;
@@ -287,13 +290,11 @@ export const generateBudgetPdf = (
       
       let legalText = company.terms + "\n";
       
-      // Default legal texts
       config.legalTextIds.forEach(id => {
           const t = DEFAULT_LEGAL_TEXTS.find(lt => lt.id === id);
           if (t) legalText += `• ${t.text}\n`;
       });
       
-      // Custom legal texts
       if (config.customLegalTexts && config.customLegalTexts.length > 0) {
           config.customLegalTexts.forEach(clt => {
               if (clt.active) {
@@ -312,7 +313,6 @@ export const generateBudgetPdf = (
 
   // --- SIGNATURES ---
   if (config.showSignatures) {
-      // Check space for signature boxes (height approx 40)
       if (finalY > pageHeight - 50) {
           doc.addPage();
           finalY = 40;
@@ -335,7 +335,6 @@ export const generateBudgetPdf = (
       doc.rect(clientBoxX, finalY, boxW, boxH);
       doc.text("Aceptación del Cliente", clientBoxX + 2, finalY + 4);
 
-      // Embed Client Signature Image
       if (budget.clientSignature) {
           try {
               doc.addImage(budget.clientSignature, 'PNG', clientBoxX + 10, finalY + 5, boxW - 20, boxH - 10);
@@ -347,7 +346,6 @@ export const generateBudgetPdf = (
   const footerY = pageHeight - 15;
   const logoH = 10;
   
-  // Partner Logos (Including Logic now)
   const activeLogos = Object.values(config.partnerLogos).filter(l => !!l && l.length > 0);
   if (activeLogos.length > 0) {
       const gap = 5;
@@ -357,44 +355,21 @@ export const generateBudgetPdf = (
       activeLogos.forEach(logo => {
           if (logo) {
             try {
-                // Determine format
-                const format = logo.includes('svg+xml') ? 'SVG' : 'PNG';
-                if (format === 'SVG') {
-                    // jsPDF doesn't natively render SVG strings easily without canvg or similar.
-                    // For this environment, we rely on the image already being a dataURI that addImage supports 
-                    // (mostly PNG/JPEG). 
-                    // HACK: Since we defined SVGs, if addImage fails, we skip.
-                    // BETTER: We should use svg2pdf if possible, but limited deps here.
-                    // FALLBACK: For the specific data URIs I provided, addImage MIGHT fail if jsPDF version is old.
-                    // However, let's assume standard image support. 
-                    // If the user's browser supports SVG in Canvas, we might need a converter.
-                    // Given constraints: I will assume the user has added valid PNGs or the environment handles base64 well.
-                    // The SVG base64 strings I provided are valid data URIs. 
-                    
-                    // Actually, standard jsPDF addImage does NOT support SVG data URI directly.
-                    // I will let this try, but likely for the placeholder logos to work perfectly
-                    // they should ideally be PNG base64. 
-                    // I will rely on the user uploading real images later if these don't render.
-                    doc.addImage(logo, 'PNG', startX, footerY - 5, w, logoH, undefined, 'FAST');
-                } else {
-                    doc.addImage(logo, 'PNG', startX, footerY - 5, w, logoH, undefined, 'FAST');
-                }
+                // If it's Sage, we might want to filter logs or change appearance?
+                // For now, keep standard logos
+                doc.addImage(logo, 'PNG', startX, footerY - 5, w, logoH, undefined, 'FAST');
                 startX += w + gap;
-            } catch (e) {
-                // If image fails, just skip it to not break PDF
-            }
+            } catch (e) {}
           }
       });
   }
 
-  // Footer Text
   if (config.footerText) {
       doc.setFontSize(7);
       doc.setTextColor(150);
       doc.text(config.footerText, pageWidth / 2, pageHeight - 20, { align: 'center' });
   }
 
-  // Page Numbers
   if (config.showPageNumbers) {
       const pageCount = doc.getNumberOfPages();
       for(let i = 1; i <= pageCount; i++) {

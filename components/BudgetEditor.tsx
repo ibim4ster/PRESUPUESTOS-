@@ -2,11 +2,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { storageService } from '../services/storage';
 import { generateBudgetPdf } from '../services/pdfGenerator';
-import { Budget, Client, LineItem, Product, PdfConfig } from '../types';
+import { Budget, Client, LineItem, Product, PdfConfig, SystemType } from '../types';
 
 interface BudgetEditorProps {
   initialBudget?: Budget | null;
   onClose: () => void;
+  currentSystem: SystemType;
 }
 
 // Icons
@@ -21,7 +22,6 @@ const EraserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 const XIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 const DownloadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
 
-// Signature Component
 const SignaturePad = ({ onSave, onClear, initial }: { onSave: (data: string) => void, onClear: () => void, initial?: string }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -115,15 +115,16 @@ const SignaturePad = ({ onSave, onClear, initial }: { onSave: (data: string) => 
   );
 };
 
-export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClose }) => {
-  // Determine if it's a new budget or editing
+export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClose, currentSystem }) => {
   const isNew = !initialBudget;
+  const isSage = currentSystem === 'sage';
+  const saveBtnColor = isSage ? 'bg-[#00d061] text-black hover:bg-[#00b050]' : 'bg-red-600 text-white hover:bg-red-700';
 
   const [budget, setBudget] = useState<Budget>(() => {
     if (initialBudget) return initialBudget;
     
     // Auto-generate number for new budget
-    const nextNumber = storageService.getNextBudgetNumber();
+    const nextNumber = storageService.getNextBudgetNumber(currentSystem);
     
     return {
       id: crypto.randomUUID(),
@@ -138,7 +139,8 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
       discountPercentage: 0,
       bonusAmount: 0,
       taxPercentage: 21,
-      clientSignature: ''
+      clientSignature: '',
+      system: currentSystem
     };
   });
 
@@ -148,8 +150,6 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
   const [pdfConfig] = useState(storageService.getPdfConfig());
   
   const [isSaved, setIsSaved] = useState(true);
-  
-  // Preview State
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -158,7 +158,6 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
     setProducts(storageService.getProducts());
   }, []);
 
-  // Auto-save logic
   useEffect(() => {
     if(!isSaved) {
       const timer = setTimeout(() => {
@@ -179,12 +178,11 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
     if (client) {
       updateBudget({ 
         clientId: client.id,
-        clientData: { ...client } // Clone snapshot
+        clientData: { ...client }
       });
     }
   };
 
-  // Line Item Logic
   const addLineItem = () => {
     const newItem: LineItem = {
       id: crypto.randomUUID(),
@@ -242,7 +240,6 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
     updateBudget({ lineItems: newLines });
   };
 
-  // Financial Calculations (Ignoring sections)
   const productItems = budget.lineItems.filter(i => i.type !== 'section');
   const subtotal = productItems.reduce((acc, item) => acc + (item.units * item.price), 0);
   const discountAmount = subtotal * (budget.discountPercentage / 100);
@@ -260,13 +257,10 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
 
   const handlePreview = () => {
     storageService.saveBudget(budget);
-    
     try {
-      // Generate Blob
       const doc = generateBudgetPdf(budget, company, pdfConfig);
       const blob = doc.output('blob');
       const url = URL.createObjectURL(blob);
-      
       setPreviewUrl(url);
       setShowPreviewModal(true);
     } catch (e) {
@@ -282,6 +276,9 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
     setShowPreviewModal(false);
     setPreviewUrl(null);
   };
+
+  // Filter products relevant to current system or marked as both
+  const availableProducts = products.filter(p => !p.system || p.system === 'both' || p.system === currentSystem);
 
   return (
     <>
@@ -299,6 +296,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
                 <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${isSaved ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                   {isSaved ? 'Guardado' : 'Guardando...'}
                 </span>
+                <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">{currentSystem}</span>
               </div>
             </div>
           </div>
@@ -311,7 +309,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
             </button>
             <button 
               onClick={handleGeneratePDF} 
-              className="flex-1 md:flex-none justify-center px-4 py-3 md:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-md flex items-center gap-2 font-medium text-sm"
+              className={`flex-1 md:flex-none justify-center px-4 py-3 md:py-2 rounded-lg shadow-md flex items-center gap-2 font-medium text-sm transition-colors ${saveBtnColor}`}
             >
               <SaveIcon /> Generar PDF
             </button>
@@ -327,7 +325,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
             <div className="md:col-span-7 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  <svg className={`w-4 h-4 ${isSage ? 'text-[#00d061]' : 'text-red-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                   Datos del Cliente
                 </h3>
                 <select 
@@ -437,7 +435,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
                   + Manual
                 </button>
                 <select 
-                  className="text-sm border border-accent bg-accent/5 text-accent font-medium px-3 py-2 rounded-md w-full md:w-48 focus:ring-2 focus:ring-accent/50" 
+                  className={`text-sm border bg-opacity-5 font-medium px-3 py-2 rounded-md w-full md:w-48 focus:ring-2 focus:ring-opacity-50 ${isSage ? 'border-[#00d061] text-black bg-[#00d061] focus:ring-green-400' : 'border-red-600 text-red-600 bg-red-600 focus:ring-red-400'}`} 
                   onChange={e => {
                       const p = products.find(prod => prod.id === e.target.value);
                       if(p) {
@@ -447,7 +445,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
                   }}
                 >
                   <option value="">+ Añadir Producto...</option>
-                  {products.map(p => <option key={p.id} value={p.id}>{p.reference}</option>)}
+                  {availableProducts.map(p => <option key={p.id} value={p.id}>{p.reference}</option>)}
                 </select>
               </div>
             </div>
@@ -492,7 +490,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
                     }
 
                     return (
-                      <tr key={item.id} className="group hover:bg-blue-50/30">
+                      <tr key={item.id} className="group hover:bg-gray-50/80">
                         <td className="p-2 text-center">
                           <div className="flex flex-col text-slate-300 group-hover:text-slate-400">
                             <button onClick={() => moveLineItem(index, 'up')} className="hover:text-slate-800 p-1"><ArrowUpIcon/></button>
@@ -620,7 +618,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
               
               <div className="flex justify-between items-end">
                 <span className="text-xl font-bold text-slate-900">TOTAL</span>
-                <span className="text-3xl font-bold text-accent">{total.toFixed(2)} €</span>
+                <span className={`text-3xl font-bold ${isSage ? 'text-[#00d061]' : 'text-red-600'}`}>{total.toFixed(2)} €</span>
               </div>
             </div>
           </section>
@@ -633,12 +631,12 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
           <div className="bg-white w-full max-w-5xl h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-white z-10">
               <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <EyeIcon /> Vista Previa del Documento
+                <EyeIcon /> Vista Previa del Documento ({isSage ? 'Sage' : 'Ágora'})
               </h3>
               <div className="flex gap-2">
                 <button 
                   onClick={handleGeneratePDF}
-                  className="bg-accent text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 flex items-center gap-2"
+                  className={`${saveBtnColor} px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2`}
                 >
                   <DownloadIcon /> Descargar PDF
                 </button>
