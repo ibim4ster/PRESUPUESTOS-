@@ -224,11 +224,11 @@ export const PdfCustomizer: React.FC = () => {
            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full">
               <h3 className="font-bold text-slate-800 mb-4 border-b pb-2">Logos Footer (Partners)</h3>
               <div className="space-y-6">
-                 {['agora', 'concord', 'cashloogy'].map(p => (
+                 {['agora', 'concord', 'cashloogy', 'logic'].map(p => (
                    <div key={p}>
                       <label className="block text-xs font-bold uppercase mb-2 text-slate-500 tracking-wider">{p}</label>
                       <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 flex flex-col items-center gap-3 bg-gray-50 hover:bg-gray-100 transition-colors relative group">
-                         <div className="h-12 flex items-center justify-center overflow-hidden">
+                         <div className="h-12 flex items-center justify-center overflow-hidden w-full">
                            {/* @ts-ignore */}
                            {config.partnerLogos[p as keyof typeof config.partnerLogos] ? 
                              /* @ts-ignore */

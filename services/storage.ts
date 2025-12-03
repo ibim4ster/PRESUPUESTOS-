@@ -10,15 +10,22 @@ const KEYS = {
   COMPANY: 'proquote_company',
   PDF_CONFIG: 'proquote_pdf_config',
   CLOUD_CONFIG: 'proquote_cloud_config',
-  INIT: 'proquote_initialized_v2'
+  INIT: 'proquote_initialized_v3' // Updated version to force seed
 };
 
-// TUS CLAVES DE FIREBASE (Configuradas por defecto)
+// --- LOGOS PRE-CARGADOS (SVG BASE64) ---
+// Estos logos se cargan por defecto si no hay configuración
+const LOGO_AGORA = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgNDAiPjx0ZXh0IHk9IjMwIiB4PSI1MCIgZmlsbD0iI2UzMDYxMyIgZm9udC1mYW1pbHk9ImFyaWFsIiBmb250LXdlaWdodD0iYm9sZCIgZm9udC1zaXplPSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+w6Fnb3JhPC90ZXh0Pjwvc3ZnPg==";
+const LOGO_CONCORD = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgNDAiPjx0ZXh0IHk9IjMwIiB4PSI1MCIgZmlsbD0iIzAwOTYzOSIgZm9udC1mYW1pbHk9ImFyaWFsIiBmb250LXdlaWdodD0iYm9sZCIgZm9udC1zaXplPSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Y29uY29yZDwvdGV4dD48L3N2Zz4=";
+const LOGO_CASHLOGY = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNTAgNDAiPjx0ZXh0IHk9IjMwIiB4PSI3NSIgZmlsbD0iI2ZmY2QwMCIgZm9udC1mYW1pbHk9ImFyaWFsIiBmb250LXdlaWdodD0iYm9sZCIgZm9udC1zaXplPSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Y2FzaGxvZ3k8L3RleHQ+PC9zdmc+";
+const LOGO_LOGIC = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgNDAiPjx0ZXh0IHk9IjMwIiB4PSI1MCIgZmlsbD0iI2QwMTAxMCIgZm9udC1mYW1pbHk9ImFyaWFsIiBmb250LXdlaWdodD0iYm9sZCIgZm9udC1zaXplPSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+TE9HSUM8L3RleHQ+PC9zdmc+";
+
+// TUS CLAVES DE FIREBASE (Configuradas por defecto y forzadas)
 const DEFAULT_CLOUD_CONFIG: CloudConfig = {
   apiKey: "AIzaSyA2PFM21gHn2840SZQ0Bk4tAbM0LxF3ADM",
   authDomain: "presupuestos-93a99.firebaseapp.com",
   projectId: "presupuestos-93a99",
-  enabled: true // Activado por defecto
+  enabled: true
 };
 
 // Event System for Reactivity
@@ -49,8 +56,15 @@ let db: any = null;
 let unsubscribeFunctions: Function[] = [];
 
 const initFirebase = async () => {
-  // Load local config, but fallback to your hardcoded credentials
-  const config = loadLocal<CloudConfig>(KEYS.CLOUD_CONFIG, DEFAULT_CLOUD_CONFIG);
+  // Always use the hardcoded config to ensure sync between devices
+  // unless user explicitly disabled it, but we default to enabled.
+  let config = loadLocal<CloudConfig>(KEYS.CLOUD_CONFIG, DEFAULT_CLOUD_CONFIG);
+  
+  // Force update keys if they are missing or old default
+  if (!config.apiKey || config.projectId !== "presupuestos-93a99") {
+      config = DEFAULT_CLOUD_CONFIG;
+      saveLocal(KEYS.CLOUD_CONFIG, config);
+  }
   
   // Cleanup previous connections
   unsubscribeFunctions.forEach(unsub => unsub());
@@ -60,7 +74,18 @@ const initFirebase = async () => {
 
   try {
     if (getApps().length > 0) {
-      await deleteApp(getApps()[0]);
+      // Check if existing app matches config
+      const existingApp = getApps()[0];
+      if (existingApp.options.apiKey !== config.apiKey) {
+          await deleteApp(existingApp);
+      } else {
+          db = getFirestore(existingApp);
+           // Start Listeners if DB already exists
+          startSync('budgets', KEYS.BUDGETS);
+          startSync('clients', KEYS.CLIENTS);
+          startSync('products', KEYS.PRODUCTS);
+          return;
+      }
     }
     
     const app = initializeApp({
@@ -89,12 +114,18 @@ const startSync = (collectionName: string, localKey: string) => {
     const cloudData: any[] = [];
     snapshot.forEach(doc => cloudData.push(doc.data()));
     
-    // If we have data in cloud, sync it down
-    // Note: In a real robust app, you'd do timestamp diffing. 
-    // Here we assume Cloud is source of truth if connected.
+    // Merge Strategy: Cloud is source of truth when connected
     if (cloudData.length > 0) {
         saveLocal(localKey, cloudData);
-        notify(); // Tell React components to re-render
+        notify(); // Tell React components to re-render immediately
+        console.log(`☁️ Synced ${collectionName} from cloud (${cloudData.length} items)`);
+    } else {
+        // If cloud is empty but we have local data (first sync), push local to cloud
+        const localData = loadLocal<any[]>(localKey, []);
+        if (localData.length > 0) {
+            console.log(`☁️ Initial push for ${collectionName}`);
+            localData.forEach(item => pushToCloud(collectionName, item));
+        }
     }
   }, (error) => {
       console.warn(`Sync warning for ${collectionName}:`, error.message);
@@ -106,7 +137,6 @@ const startSync = (collectionName: string, localKey: string) => {
 const pushToCloud = async (collectionName: string, item: any) => {
   if (!db) return;
   try {
-    // Local -> Cloud
     await setDoc(doc(db, collectionName, item.id), item);
   } catch (e) {
     console.error(`Cloud Push Error (${collectionName})`, e);
@@ -134,51 +164,55 @@ export const storageService = {
 
   // Initialization / Seeding
   checkAndSeedData: () => {
-    const isInit = localStorage.getItem(KEYS.INIT);
+    const initVersion = localStorage.getItem(KEYS.INIT);
     
-    // Initialize Firebase automatically on load
+    // Ensure Firebase inits
     initFirebase();
 
-    if (!isInit) {
-      // Seed Clients
-      const mockClients: Client[] = [
-        { id: '1', commercialName: 'Restaurante El Puerto', legalName: 'Gastronomía del Mar S.L.', cif: 'B12345678', address: 'Av. Marítima 45, Valencia', email: 'info@elpuerto.com', phone: '960123456', paymentMethod: 'Transferencia' },
-        { id: '2', commercialName: 'Modas Paqui', legalName: 'Francisca García', cif: '12345678Z', address: 'C/ Mayor 12, Madrid', email: 'paqui@modas.com', phone: '600111222', paymentMethod: 'Contado' },
-      ];
-      saveLocal(KEYS.CLIENTS, mockClients);
-      saveLocal(KEYS.PRODUCTS, [
-        { id: '1', reference: 'HW-001', description: 'TPV Táctil 15" Capacitivo', price: 850.00, image: '' },
-        { id: '2', reference: 'SW-001', description: 'Licencia Software TPV', price: 450.00, image: '' },
-      ]);
-      saveLocal(KEYS.COMPANY, {
-        name: 'Mi Empresa Digital S.L.', cif: 'B00000000', address: 'Calle Innovación 1, Madrid', email: 'contacto@miempresa.com', phone: '910 000 000', terms: ''
-      });
-      localStorage.setItem(KEYS.INIT, 'true');
+    // Force update of Logos if v3 not present
+    if (initVersion !== 'proquote_initialized_v3') {
+        const currentPdfConfig = loadLocal<PdfConfig>(KEYS.PDF_CONFIG, {
+            primaryColor: '#dc2626', secondaryColor: '#f8fafc', headingFont: 'helvetica', bodyFont: 'helvetica',
+            showLogo: true, showCompanyDetails: true, showImages: true, showLegal: true, showSignatures: true, showPageNumbers: true, showQr: false,
+            titleText: 'PRESUPUESTO', footerText: 'Gracias por su confianza.',
+            legalTextIds: ['tax', 'payment'], customLegalTexts: [], partnerLogos: {}
+        });
+
+        // Seed logos
+        currentPdfConfig.partnerLogos = {
+            agora: LOGO_AGORA,
+            concord: LOGO_CONCORD,
+            cashloogy: LOGO_CASHLOGY,
+            logic: LOGO_LOGIC
+        };
+        saveLocal(KEYS.PDF_CONFIG, currentPdfConfig);
+        
+        // Seed default clients/products if empty
+        if (!loadLocal(KEYS.CLIENTS, null)) {
+             const mockClients: Client[] = [
+                { id: '1', commercialName: 'Restaurante El Puerto', legalName: 'Gastronomía del Mar S.L.', cif: 'B12345678', address: 'Av. Marítima 45, Valencia', email: 'info@elpuerto.com', phone: '960123456', paymentMethod: 'Transferencia' }
+            ];
+            saveLocal(KEYS.CLIENTS, mockClients);
+        }
+
+        localStorage.setItem(KEYS.INIT, 'proquote_initialized_v3');
     }
   },
 
   // Connection Diagnostic Tool
   testConnection: async (): Promise<{success: boolean, message: string}> => {
-      if (!db) return { success: false, message: "Firebase no está inicializado. Activa la sincronización." };
+      if (!db) return { success: false, message: "Iniciando Firebase..." };
       
       try {
-          // Try to write a tiny dummy file to check permissions
           const testRef = doc(db, '_connection_test', 'test');
           await setDoc(testRef, { timestamp: new Date().toISOString() });
-          await deleteDoc(testRef); // Cleanup
-          return { success: true, message: "Conexión exitosa. Base de datos operativa." };
+          await deleteDoc(testRef); 
+          return { success: true, message: "Conexión exitosa. Sincronización activa." };
       } catch (e: any) {
           console.error(e);
-          if (e.code === 'permission-denied') {
-              return { success: false, message: "Error de Permisos: Ve a Firebase Console > Firestore > Reglas y asegúrate de que estás en 'Test Mode' o permite lectura/escritura." };
-          }
-          if (e.code === 'unavailable') {
-              return { success: false, message: "Error de Red: No se puede contactar con Firebase. Revisa tu conexión a internet." };
-          }
-          if (e.code === 'not-found' || e.message.includes('Project')) {
-               return { success: false, message: "Base de datos no encontrada. Ve a Firebase Console > Firestore Database y pulsa 'Crear base de datos'." };
-          }
-          return { success: false, message: `Error desconocido: ${e.message}` };
+          if (e.code === 'permission-denied') return { success: false, message: "Error de Permisos: Habilita 'Test Mode' en Firebase Console." };
+          if (e.code === 'unavailable') return { success: false, message: "Error de Red: No hay internet." };
+          return { success: false, message: `Error: ${e.message}` };
       }
   },
 
@@ -192,14 +226,14 @@ export const storageService = {
     else budgets.push(budget);
     
     saveLocal(KEYS.BUDGETS, budgets);
-    pushToCloud('budgets', budget); // Sync
+    pushToCloud('budgets', budget); 
     notify();
   },
 
   deleteBudget: (id: string) => {
     const filtered = storageService.getBudgets().filter(b => b.id !== id);
     saveLocal(KEYS.BUDGETS, filtered);
-    deleteFromCloud('budgets', id); // Sync
+    deleteFromCloud('budgets', id); 
     notify();
   },
 
@@ -251,7 +285,7 @@ export const storageService = {
     notify();
   },
 
-  // Configs (Local Only for now to avoid complexity)
+  // Configs
   getCompanyProfile: () => loadLocal<CompanyProfile>(KEYS.COMPANY, { name: '', cif: '', address: '', email: '', phone: '', terms: '' }),
   saveCompanyProfile: (profile: CompanyProfile) => saveLocal(KEYS.COMPANY, profile),
 
@@ -267,7 +301,7 @@ export const storageService = {
   
   saveCloudConfig: (config: CloudConfig) => {
       saveLocal(KEYS.CLOUD_CONFIG, config);
-      initFirebase(); // Re-init with new config
+      initFirebase(); 
   },
 
   exportData: () => {

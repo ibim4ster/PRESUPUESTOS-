@@ -91,6 +91,7 @@ export interface PdfConfig {
     agora?: string;
     concord?: string;
     cashloogy?: string;
+    logic?: string;
   };
 }
 
