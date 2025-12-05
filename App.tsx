@@ -7,7 +7,7 @@ import { ClientManager } from './components/ClientManager';
 import { ProductManager } from './components/ProductManager';
 import { Settings } from './components/Settings';
 import { BudgetEditor } from './components/BudgetEditor';
-import { ReportEditor } from './components/ReportEditor';
+import { PdfCustomizer } from './components/PdfCustomizer';
 import { Login } from './components/Login';
 import { AdminPanel } from './components/AdminPanel';
 import { Budget, SystemType, User } from './types';
@@ -100,7 +100,7 @@ function App() {
       
       {currentView === 'settings' && <Settings />}
 
-      {currentView === 'report-editor' && authService.isAdmin(user) && <ReportEditor />}
+      {currentView === 'pdf-customizer' && <PdfCustomizer />}
 
       {currentView === 'admin-panel' && authService.isAdmin(user) && <AdminPanel />}
       

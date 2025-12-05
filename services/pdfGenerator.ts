@@ -1,18 +1,20 @@
 
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Budget, CompanyProfile, PdfTemplate, DEFAULT_LEGAL_TEXTS } from '../types';
+import { Budget, CompanyProfile, PdfConfig, DEFAULT_LEGAL_TEXTS } from '../types';
 
 export const generateBudgetPdf = (
   budget: Budget,
   company: CompanyProfile,
-  template: PdfTemplate
+  fullConfig: PdfConfig
 ) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
   
+  // SELECT CORRECT CONFIG BASED ON SYSTEM
+  const config = fullConfig[budget.system] || fullConfig.agora;
+
   // --- UTILS ---
   const hexToRgb = (hex: string): [number, number, number] => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -23,131 +25,129 @@ export const generateBudgetPdf = (
     ] : [0, 0, 0];
   };
 
-  const primaryRgb = hexToRgb(template.primaryColor);
-  const secondaryRgb = hexToRgb(template.secondaryColor);
-  const textRgb = hexToRgb(template.textColor);
+  const primaryRgb = hexToRgb(config.primaryColor);
+  const secondaryRgb = hexToRgb(config.secondaryColor);
+  
+  // --- HEADER DESIGN ---
+  // Top Color Bar
+  doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+  doc.rect(0, 0, pageWidth, 4, 'F');
 
-  const setFont = (type: 'bold' | 'normal' | 'italic' = 'normal', size = 10, color = textRgb) => {
-      doc.setFont(template.font, type);
-      doc.setFontSize(size);
-      doc.setTextColor(color[0], color[1], color[2]);
-  };
+  let yPos = 20;
 
-  const margin = template.margins;
-
-  // --- HEADER ---
-  let yPos = margin;
-
-  if (template.layout === 'modern') {
-      // Top Color Bar
-      doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
-      doc.rect(0, 0, pageWidth, 4, 'F');
-      yPos += 10;
-  }
-
-  // Logo & Title
-  if (template.showLogo && company.logo) {
-      try {
-          const imgProps = doc.getImageProperties(company.logo);
-          const ratio = imgProps.width / imgProps.height;
-          const w = 40;
-          const h = w / ratio;
-          doc.addImage(company.logo, 'JPEG', margin, yPos, w, h);
-          // If classic, logo center? No, let's keep left for now or based on config
-      } catch (e) {}
+  // 1. Logo & Company Info
+  // Left side: Logo
+  if (config.showLogo && company.logo) {
+    try {
+      const imgProps = doc.getImageProperties(company.logo);
+      const ratio = imgProps.width / imgProps.height;
+      const w = 40;
+      const h = w / ratio;
+      doc.addImage(company.logo, 'JPEG', 15, yPos, w, h);
+      
+      // If logo is tall, adjust text start
+      if (h > 20) yPos += 5;
+    } catch (e) {
+      // Fallback
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+      doc.text(company.name, 15, yPos + 10);
+    }
   } else {
-      setFont('bold', 22, primaryRgb);
-      doc.text(company.name, margin, yPos + 10);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+    doc.text(company.name, 15, yPos + 10);
   }
 
-  // Document Title (Right Aligned)
-  setFont('bold', 24, primaryRgb);
-  doc.text(template.titleText, pageWidth - margin, yPos + 10, { align: 'right' });
+  // Right Side: Document Title & Details
+  const rightMargin = pageWidth - 15;
+  
+  doc.setFontSize(26);
+  doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+  doc.setFont('helvetica', 'bold');
+  doc.text(config.titleText, rightMargin, 25, { align: 'right' });
 
-  setFont('normal', 10, [100, 100, 100]);
-  doc.text(`Nº: ${budget.number}`, pageWidth - margin, yPos + 20, { align: 'right' });
-  doc.text(`Fecha: ${new Date(budget.createdAt).toLocaleDateString()}`, pageWidth - margin, yPos + 25, { align: 'right' });
+  doc.setFontSize(10);
+  doc.setTextColor(100);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Nº Presupuesto:`, rightMargin - 40, 35, { align: 'right' });
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0);
+  doc.text(budget.number, rightMargin, 35, { align: 'right' });
 
-  yPos = template.headerHeight + 20;
+  doc.setFontSize(10);
+  doc.setTextColor(100);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Fecha:`, rightMargin - 40, 40, { align: 'right' });
+  doc.setTextColor(0);
+  doc.text(new Date(budget.createdAt).toLocaleDateString(), rightMargin, 40, { align: 'right' });
+
+  yPos = 55;
 
   // --- INFO COLUMNS ---
-  if (template.layout === 'modern' || template.layout === 'minimal') {
-      // Draw Background for Info if modern
-      if(template.layout === 'modern') {
-        doc.setFillColor(secondaryRgb[0], secondaryRgb[1], secondaryRgb[2]);
-        doc.roundedRect(margin, yPos, pageWidth - (margin*2), 35, 2, 2, 'F');
-      }
+  // Draw Gray Background for Info
+  doc.setFillColor(248, 248, 248);
+  doc.setDrawColor(230, 230, 230);
+  doc.roundedRect(15, yPos, pageWidth - 30, 35, 2, 2, 'FD');
 
-      // Column 1: Issuer (Company)
-      if (template.showCompanyDetails) {
-          setFont('bold', 8, [150, 150, 150]);
-          doc.text("EMISOR", margin + 5, yPos + 8);
-          
-          setFont('bold', 10, textRgb);
-          doc.text(company.name, margin + 5, yPos + 14);
-          setFont('normal', 9, [80, 80, 80]);
-          doc.text(company.address, margin + 5, yPos + 19);
-          doc.text(`CIF: ${company.cif}`, margin + 5, yPos + 24);
-          doc.text(`${company.email} • ${company.phone}`, margin + 5, yPos + 29);
-      }
+  // Column 1: Issuer (Company)
+  doc.setFontSize(8);
+  doc.setTextColor(150);
+  doc.setFont('helvetica', 'bold');
+  doc.text("EMISOR", 20, yPos + 8);
+  
+  doc.setTextColor(50);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text(company.name, 20, yPos + 14);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(80);
+  doc.text(company.address, 20, yPos + 19);
+  doc.text(`CIF: ${company.cif}`, 20, yPos + 24);
+  doc.text(`${company.email} • ${company.phone}`, 20, yPos + 29);
 
-      // Column 2: Client
-      if (template.showClientDetails) {
-          const col2X = pageWidth / 2 + 5;
-          setFont('bold', 8, [150, 150, 150]);
-          doc.text("CLIENTE", col2X, yPos + 8);
+  // Column 2: Client
+  const col2X = pageWidth / 2 + 5;
+  doc.setFontSize(8);
+  doc.setTextColor(150);
+  doc.setFont('helvetica', 'bold');
+  doc.text("CLIENTE", col2X, yPos + 8);
 
-          setFont('bold', 10, textRgb);
-          doc.text(budget.clientData.commercialName || 'Cliente Genérico', col2X, yPos + 14);
-          setFont('normal', 9, [80, 80, 80]);
-          doc.text(budget.clientData.legalName, col2X, yPos + 19);
-          doc.text(budget.clientData.address, col2X, yPos + 24);
-          doc.text(`CIF: ${budget.clientData.cif}`, col2X, yPos + 29);
-      }
-      yPos += 45;
-  } else {
-      // Classic Layout: Line separated
-      doc.setDrawColor(200);
-      doc.line(margin, yPos, pageWidth - margin, yPos);
-      yPos += 10;
-      
-      setFont('bold', 11, textRgb);
-      doc.text("De:", margin, yPos);
-      doc.text("Para:", pageWidth / 2, yPos);
-      
-      setFont('normal', 10, [80, 80, 80]);
-      yPos += 5;
-      doc.text(company.name, margin, yPos);
-      doc.text(budget.clientData.commercialName, pageWidth / 2, yPos);
-      yPos += 5;
-      doc.text(company.address, margin, yPos);
-      doc.text(budget.clientData.address, pageWidth / 2, yPos);
-      yPos += 5;
-      doc.text(`CIF: ${company.cif}`, margin, yPos);
-      doc.text(`CIF: ${budget.clientData.cif}`, pageWidth / 2, yPos);
-      
-      yPos += 20;
-  }
+  doc.setTextColor(50);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text(budget.clientData.commercialName || 'Cliente Genérico', col2X, yPos + 14);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(80);
+  doc.text(budget.clientData.legalName, col2X, yPos + 19);
+  doc.text(budget.clientData.address, col2X, yPos + 24);
+  doc.text(`CIF: ${budget.clientData.cif}`, col2X, yPos + 29);
+
+  yPos += 45;
 
   // --- TABLE ---
   const tableColumn = ["Concepto", "Uds", "Precio", "Total"];
-  if (template.showImages) tableColumn.unshift("Img");
+  if (config.showImages) tableColumn.unshift("Img");
 
   const tableRows = budget.lineItems.map(item => {
     // Section Header Row
     if (item.type === 'section') {
       return [{ 
         content: item.description.toUpperCase(), 
-        colSpan: template.showImages ? 5 : 4, 
+        colSpan: config.showImages ? 5 : 4, 
         styles: { 
           fontStyle: 'bold' as const, 
-          fillColor: template.layout === 'minimal' ? [255,255,255] : secondaryRgb, 
+          fillColor: secondaryRgb, 
           textColor: primaryRgb,
-          halign: 'left' as const
+          halign: 'left' as const,
+          cellPadding: { top: 3, bottom: 3, left: 5 }
         } 
       }];
     }
     
+    // Product Row
     const row: any[] = [
       { content: `${item.reference ? `[${item.reference}] ` : ''}${item.description}`, styles: { cellWidth: 'auto' as const } },
       { content: item.units, styles: { halign: 'center' as const } },
@@ -155,8 +155,8 @@ export const generateBudgetPdf = (
       { content: (item.units * item.price).toLocaleString('es-ES', {minimumFractionDigits: 2}) + ' €', styles: { halign: 'right' as const, fontStyle: 'bold' as const } }
     ];
 
-    if (template.showImages) {
-      row.unshift({ content: '', styles: { minCellHeight: 12 } }); 
+    if (config.showImages) {
+      row.unshift({ content: '', styles: { minCellHeight: 12 } }); // Placeholder
     }
     return row;
   });
@@ -165,23 +165,21 @@ export const generateBudgetPdf = (
     startY: yPos,
     head: [tableColumn],
     body: tableRows,
-    theme: template.layout === 'minimal' ? 'plain' : 'striped',
+    theme: 'plain',
     headStyles: { 
-        fillColor: template.layout === 'minimal' ? [255,255,255] : primaryRgb, 
-        textColor: template.layout === 'minimal' ? textRgb : 255, 
+        fillColor: primaryRgb, 
+        textColor: 255, 
         fontStyle: 'bold',
-        halign: 'center',
-        lineWidth: { bottom: template.layout === 'minimal' ? 0.5 : 0 },
-        lineColor: textRgb
+        halign: 'center'
     },
     styles: { 
-        font: template.font,
         fontSize: 9, 
         cellPadding: 3, 
         valign: 'middle',
-        textColor: textRgb
+        lineColor: [230, 230, 230],
+        lineWidth: { bottom: 0.1 }
     },
-    columnStyles: template.showImages ? {
+    columnStyles: config.showImages ? {
       0: { cellWidth: 15 }, 
       1: { cellWidth: 'auto' }, 
       2: { cellWidth: 20 }, 
@@ -193,8 +191,9 @@ export const generateBudgetPdf = (
       2: { cellWidth: 30 }, 
       3: { cellWidth: 30 } 
     },
+    // Draw Images
     didDrawCell: (data) => {
-        if (template.showImages && data.section === 'body' && data.column.index === 0) {
+        if (config.showImages && data.section === 'body' && data.column.index === 0) {
             const item = budget.lineItems[data.row.index];
             if (item && item.type === 'product' && item.image) {
                 try {
@@ -203,10 +202,23 @@ export const generateBudgetPdf = (
                 } catch (e) {}
             }
         }
+    },
+    didParseCell: (data) => {
+        if (data.section === 'body' && data.row.index % 2 === 0 && data.row.cells[0].raw && typeof data.row.cells[0].raw === 'object') {
+           // Skip styling for sections as they are already styled
+           // @ts-ignore
+           if(data.row.cells[0].raw.colSpan) return;
+        }
+        if (data.section === 'body' && data.row.index % 2 === 1) {
+             // @ts-ignore
+             if(!data.row.cells[0].raw.colSpan) {
+                data.cell.styles.fillColor = [252, 252, 252];
+             }
+        }
     }
   });
 
-  // --- TOTALS ---
+  // --- TOTALS CALCULATION ---
   const productItems = budget.lineItems.filter(i => i.type !== 'section');
   const subtotal = productItems.reduce((acc, item) => acc + (item.units * item.price), 0);
   const discountAmount = subtotal * (budget.discountPercentage / 100);
@@ -215,87 +227,152 @@ export const generateBudgetPdf = (
   const taxAmount = taxableBase * (budget.taxPercentage / 100);
   const total = taxableBase + taxAmount;
 
+  // --- TOTALS BLOCK ---
+  // Fix: use any casting to access lastAutoTable which is added by the plugin
   let finalY = (doc as any).lastAutoTable.finalY + 10;
-  if (finalY > pageHeight - 60) { doc.addPage(); finalY = 20; }
+  
+  if (finalY > pageHeight - 60) {
+    doc.addPage();
+    finalY = 20;
+  }
 
   const totalsWidth = 70;
-  const totalsX = pageWidth - totalsWidth - margin;
+  const totalsX = pageWidth - totalsWidth - 15;
   
-  const drawTotalLine = (label: string, value: string, isBold = false, color = textRgb, bg: [number, number, number] | null = null) => {
+  const drawTotalLine = (label: string, value: string, isBold = false, color: [number, number, number] = [0,0,0], bg: [number, number, number] | null = null) => {
     if (bg) {
         doc.setFillColor(bg[0], bg[1], bg[2]);
         doc.rect(totalsX - 2, finalY - 4, totalsWidth + 4, 7, 'F');
     }
-    setFont(isBold ? 'bold' : 'normal', 10, color);
+    doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+    doc.setTextColor(color[0], color[1], color[2]);
     doc.text(label, totalsX, finalY);
-    doc.text(value, pageWidth - margin, finalY, { align: 'right' });
+    doc.text(value, pageWidth - 15, finalY, { align: 'right' });
     finalY += 7;
   };
 
   drawTotalLine("Subtotal", `${subtotal.toFixed(2)} €`);
-  if (budget.discountPercentage > 0) drawTotalLine(`Descuento (${budget.discountPercentage}%)`, `-${discountAmount.toFixed(2)} €`, false, [220, 38, 38]);
-  if (budget.bonusAmount > 0) drawTotalLine("Bono / Subvención", `-${budget.bonusAmount.toFixed(2)} €`, false, [22, 163, 74]);
+  
+  if (budget.discountPercentage > 0) {
+    drawTotalLine(`Descuento (${budget.discountPercentage}%)`, `-${discountAmount.toFixed(2)} €`, false, [220, 38, 38]);
+  }
+  
+  if (budget.bonusAmount > 0) {
+    drawTotalLine("Bono / Subvención", `-${budget.bonusAmount.toFixed(2)} €`, false, [22, 163, 74]);
+  }
+
   drawTotalLine("Base Imponible", `${taxableBase.toFixed(2)} €`, true);
   drawTotalLine(`IVA (${budget.taxPercentage}%)`, `${taxAmount.toFixed(2)} €`);
-  
-  finalY += 2;
-  drawTotalLine("TOTAL", `${total.toFixed(2)} €`, true, template.layout === 'minimal' ? textRgb : [255, 255, 255], template.layout === 'minimal' ? null : primaryRgb);
 
-  // --- LEGAL & TERMS ---
-  if (template.showLegal) {
-      if (finalY > pageHeight - 80) { doc.addPage(); finalY = 20; } else { finalY += 10; }
+  finalY += 2;
+  drawTotalLine("TOTAL", `${total.toFixed(2)} €`, true, [255, 255, 255], primaryRgb);
+
+  // --- TERMS & LEGAL ---
+  if (config.showLegal) {
+      if (finalY > pageHeight - 80) {
+          doc.addPage();
+          finalY = 20;
+      } else {
+          finalY += 10;
+      }
       
-      setFont('bold', 8, primaryRgb);
-      doc.text("TÉRMINOS Y CONDICIONES", margin, finalY);
+      doc.setFontSize(8);
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+      doc.setFont('helvetica', 'bold');
+      doc.text("TÉRMINOS Y CONDICIONES", 15, finalY);
       finalY += 5;
 
-      setFont('normal', 7, [80, 80, 80]);
+      doc.setTextColor(80);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      
       let legalText = company.terms + "\n";
-      DEFAULT_LEGAL_TEXTS.forEach(t => legalText += `• ${t.text}\n`);
-      const splitLegal = doc.splitTextToSize(legalText, pageWidth - (margin * 2));
-      doc.text(splitLegal, margin, finalY);
+      
+      config.legalTextIds.forEach(id => {
+          const t = DEFAULT_LEGAL_TEXTS.find(lt => lt.id === id);
+          if (t) legalText += `• ${t.text}\n`;
+      });
+      
+      if (config.customLegalTexts && config.customLegalTexts.length > 0) {
+          config.customLegalTexts.forEach(clt => {
+              if (clt.active) {
+                  legalText += `• ${clt.text}\n`;
+              }
+          });
+      }
+
+      const splitLegal = doc.splitTextToSize(legalText, pageWidth - 30);
+      doc.text(splitLegal, 15, finalY);
+      
       finalY += (splitLegal.length * 3) + 10;
   } else {
       finalY += 20;
   }
 
   // --- SIGNATURES ---
-  if (template.showSignatures) {
-      if (finalY > pageHeight - 50) { doc.addPage(); finalY = 40; }
+  if (config.showSignatures) {
+      if (finalY > pageHeight - 50) {
+          doc.addPage();
+          finalY = 40;
+      }
+
       const boxW = 80;
       const boxH = 35;
       
       doc.setDrawColor(200);
       doc.setLineWidth(0.1);
       
-      // Company
-      doc.rect(margin, finalY, boxW, boxH);
-      setFont('normal', 7, [150, 150, 150]);
-      doc.text("Firma y Sello de la Empresa", margin + 2, finalY + 4);
+      // Company Signature
+      doc.rect(15, finalY, boxW, boxH);
+      doc.setFontSize(7);
+      doc.setTextColor(150);
+      doc.text("Firma y Sello de la Empresa", 17, finalY + 4);
 
-      // Client
-      const clientBoxX = pageWidth - margin - boxW;
+      // Client Signature
+      const clientBoxX = pageWidth - 15 - boxW;
       doc.rect(clientBoxX, finalY, boxW, boxH);
       doc.text("Aceptación del Cliente", clientBoxX + 2, finalY + 4);
 
       if (budget.clientSignature) {
-          try { doc.addImage(budget.clientSignature, 'PNG', clientBoxX + 10, finalY + 5, boxW - 20, boxH - 10); } catch(e) {}
+          try {
+              doc.addImage(budget.clientSignature, 'PNG', clientBoxX + 10, finalY + 5, boxW - 20, boxH - 10);
+          } catch(e) {}
       }
   }
 
   // --- FOOTER ---
   const footerY = pageHeight - 15;
-  if (template.footerText) {
-      setFont('normal', 8, [150, 150, 150]);
-      doc.text(template.footerText, pageWidth / 2, footerY, { align: 'center' });
+  const logoH = 10;
+  
+  const activeLogos = Object.values(config.partnerLogos).filter(l => !!l && l.length > 0);
+  if (activeLogos.length > 0) {
+      const gap = 5;
+      const w = 20;
+      let startX = (pageWidth - (activeLogos.length * w) - ((activeLogos.length - 1) * gap)) / 2;
+      
+      activeLogos.forEach(logo => {
+          if (logo) {
+            try {
+                doc.addImage(logo, 'PNG', startX, footerY - 5, w, logoH, undefined, 'FAST');
+                startX += w + gap;
+            } catch (e) {}
+          }
+      });
   }
 
-  if (template.showPageNumbers) {
+  if (config.footerText) {
+      doc.setFontSize(7);
+      doc.setTextColor(150);
+      doc.text(config.footerText, pageWidth / 2, pageHeight - 20, { align: 'center' });
+  }
+
+  if (config.showPageNumbers) {
       const pageCount = doc.getNumberOfPages();
       for(let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
-        setFont('normal', 7, [180, 180, 180]);
-        doc.text(`Página ${i} de ${pageCount}`, pageWidth - margin, pageHeight - 5, { align: 'right' });
+        doc.setFontSize(7);
+        doc.setTextColor(180);
+        doc.text(`Página ${i} de ${pageCount}`, pageWidth - 10, pageHeight - 5, { align: 'right' });
       }
   }
 

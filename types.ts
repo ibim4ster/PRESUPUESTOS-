@@ -18,7 +18,7 @@ export interface LogEntry {
   timestamp: string;
   userId: string;
   userName: string;
-  action: string;
+  action: string; // 'LOGIN', 'CREATE_BUDGET', 'DELETE_CLIENT', etc.
   details: string;
 }
 
@@ -27,8 +27,8 @@ export interface Product {
   reference: string;
   description: string;
   price: number;
-  image?: string; 
-  system: SystemType | 'both'; 
+  image?: string; // Base64
+  system: SystemType | 'both'; // 'both' is kept for backward compatibility, though specific assignment is preferred
 }
 
 export interface ProductKitItem {
@@ -38,7 +38,7 @@ export interface ProductKitItem {
 
 export interface ProductKit {
   id: string;
-  reference: string;
+  reference: string; // Kit Name
   description: string;
   items: ProductKitItem[];
   system: SystemType | 'both';
@@ -47,7 +47,7 @@ export interface ProductKit {
 export interface Client {
   id: string;
   commercialName: string;
-  legalName: string;
+  legalName: string; // Razón Social
   cif: string;
   address: string;
   email: string;
@@ -59,38 +59,38 @@ export interface LineItem {
   id: string;
   type: 'product' | 'section'; 
   productId?: string;
-  reference: string;
-  description: string;
-  units: number;
-  price: number;
+  reference: string; // Empty if section
+  description: string; // Title if section
+  units: number; // 0 if section
+  price: number; // 0 if section
   image?: string;
 }
 
 export interface Budget {
   id: string;
-  number: string;
-  createdAt: string;
+  number: string; // Sequential ID
+  createdAt: string; // ISO Date
   updatedAt: string;
   status: 'draft' | 'pending' | 'accepted' | 'rejected';
   clientId: string;
-  clientData: Client;
+  clientData: Client; // Snapshot of client data at time of creation
   validityDays: number;
   
   system: SystemType; 
   
   // Attribution
-  createdBy?: string;
-  creatorName?: string;
+  createdBy?: string; // User ID
+  creatorName?: string; // Name Snapshot
 
   lineItems: LineItem[];
   
   // Financials
   discountPercentage: number;
-  bonusAmount: number;
+  bonusAmount: number; // Subvención (fixed amount)
   taxPercentage: number;
   
-  clientSignature?: string; 
-  internalNotes?: string; 
+  clientSignature?: string; // Base64 image
+  internalNotes?: string; // Notes not visible to client
 }
 
 export interface CompanyProfile {
@@ -99,44 +99,49 @@ export interface CompanyProfile {
   address: string;
   email: string;
   phone: string;
-  logo?: string; 
-  terms: string; 
+  logo?: string; // Base64
+  terms: string; // Default terms
 }
 
-// --- NEW PDF TEMPLATE SYSTEM ---
-
-export type PdfFont = 'helvetica' | 'times' | 'courier';
-export type PdfLayout = 'modern' | 'classic' | 'minimal';
-
-export interface PdfTemplate {
+export interface CustomLegalText {
   id: string;
-  name: string;
-  isDefault: boolean;
-  
-  // Style Config
-  layout: PdfLayout;
-  font: PdfFont;
-  primaryColor: string;
-  secondaryColor: string;
-  textColor: string;
+  text: string;
+  active: boolean;
+}
+
+// New Structure: Separate configs per system
+export interface PdfSystemConfig {
+  primaryColor: string; 
+  secondaryColor: string; 
   
   // Toggles
   showLogo: boolean;
   showCompanyDetails: boolean;
-  showClientDetails: boolean;
   showImages: boolean;
   showLegal: boolean;
   showSignatures: boolean;
   showPageNumbers: boolean;
   showQr: boolean;
-  
-  // Text Content
-  titleText: string;
+
+  // Custom Texts
+  titleText: string; 
   footerText: string;
   
-  // Advanced
-  headerHeight: number; // mm
-  margins: number; // mm
+  legalTextIds: string[]; 
+  customLegalTexts: CustomLegalText[]; 
+
+  partnerLogos: {
+    slot1?: string; // Agora: Agora / Sage: Partner 1
+    slot2?: string; // Agora: Concord / Sage: Partner 2
+    slot3?: string; // Agora: Cashlogy / Sage: Partner 3
+  };
+}
+
+export interface PdfConfig {
+  agora: PdfSystemConfig;
+  sage: PdfSystemConfig; // Sage 50
+  sage200: PdfSystemConfig;
+  sagedespachos: PdfSystemConfig;
 }
 
 export interface CloudConfig {
@@ -149,37 +154,7 @@ export interface CloudConfig {
 export const DEFAULT_LEGAL_TEXTS = [
   { id: 'tax', text: 'Impuestos indirectos no incluidos.' },
   { id: 'connectivity', text: 'El cliente debe disponer de conexión a internet para soporte remoto.' },
-  { id: 'kit_digital', text: 'Solución financiada por el Programa KIT Digital.' },
+  { id: 'kit_digital', text: 'Solución financiada por el Programa KIT Digital. Si no se recibe la subvención, el cliente abonará el total.' },
+  { id: 'data_migration', text: 'El traspaso de datos no está incluido salvo especificación contraria.' },
   { id: 'payment', text: 'Forma de pago según lo estipulado en la ficha de cliente.' },
 ];
-
-// --- PDF CUSTOMIZER CONFIG ---
-
-export interface CustomLegalText {
-  id: string;
-  text: string;
-  active: boolean;
-}
-
-export interface PdfSystemConfig {
-  primaryColor: string;
-  secondaryColor: string;
-  titleText: string;
-  showLogo: boolean;
-  showCompanyDetails: boolean;
-  showImages: boolean;
-  showLegal: boolean;
-  showSignatures: boolean;
-  showPageNumbers: boolean;
-  showQr: boolean;
-  legalTextIds: string[];
-  customLegalTexts: CustomLegalText[];
-  footerText: string;
-  partnerLogos: {
-    slot1?: string;
-    slot2?: string;
-    slot3?: string;
-  };
-}
-
-export type PdfConfig = Record<SystemType, PdfSystemConfig>;

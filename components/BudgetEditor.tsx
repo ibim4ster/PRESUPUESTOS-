@@ -3,14 +3,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { storageService } from '../services/storage';
 import { generateBudgetPdf } from '../services/pdfGenerator';
-import { Budget, Client, LineItem, Product, PdfTemplate, SystemType, ProductKit, User } from '../types';
+import { Budget, Client, LineItem, Product, PdfConfig, SystemType, ProductKit, User } from '../types';
 import { SearchableSelect } from './SearchableSelect';
 
 interface BudgetEditorProps {
   initialBudget?: Budget | null;
   onClose: () => void;
   currentSystem: SystemType;
-  currentUser: User; 
+  currentUser: User; // Added prop
 }
 
 // Icons
@@ -126,7 +126,10 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
 
   const [budget, setBudget] = useState<Budget>(() => {
     if (initialBudget) return initialBudget;
+    
+    // Auto-generate number for new budget
     const nextNumber = storageService.getNextBudgetNumber(currentSystem);
+    
     return {
       id: crypto.randomUUID(),
       number: nextNumber,
@@ -143,6 +146,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
       clientSignature: '',
       system: currentSystem,
       internalNotes: '',
+      // ATTRIBUTION
       createdBy: currentUser.id,
       creatorName: currentUser.name
     };
@@ -151,9 +155,8 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
   const [clients, setClients] = useState<Client[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [kits, setKits] = useState<ProductKit[]>([]);
-  const [templates, setTemplates] = useState<PdfTemplate[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [company] = useState(storageService.getCompanyProfile());
+  const [pdfConfig] = useState(storageService.getPdfConfig());
   
   const [isSaved, setIsSaved] = useState(true);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -163,15 +166,6 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
     setClients(storageService.getClients());
     setProducts(storageService.getProducts());
     setKits(storageService.getProductKits());
-    
-    // Load templates
-    const tpls = storageService.getTemplates();
-    setTemplates(tpls);
-    // Select default
-    const def = tpls.find(t => t.isDefault);
-    if(def) setSelectedTemplateId(def.id);
-    else if(tpls.length > 0) setSelectedTemplateId(tpls[0].id);
-
   }, []);
 
   useEffect(() => {
@@ -185,6 +179,8 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
 
   const saveWithLogs = () => {
       storageService.saveBudget(budget);
+      
+      // LOG THE ACTION
       const actionType = isNew ? 'PRESUPUESTO_CREADO' : 'PRESUPUESTO_MODIFICADO';
       storageService.addLog({
           userId: currentUser.id,
@@ -192,6 +188,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
           action: actionType,
           details: `Presupuesto ${budget.number} (${budget.clientData.commercialName || 'Sin Cliente'})`
       });
+
       setIsSaved(true);
   };
 
@@ -212,38 +209,70 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
 
   const addLineItem = () => {
     const newItem: LineItem = {
-      id: crypto.randomUUID(), type: 'product', reference: '', description: '', units: 1, price: 0
+      id: crypto.randomUUID(),
+      type: 'product',
+      reference: '',
+      description: '',
+      units: 1,
+      price: 0
     };
     updateBudget({ lineItems: [...budget.lineItems, newItem] });
   };
 
   const addSectionItem = () => {
     const newItem: LineItem = {
-      id: crypto.randomUUID(), type: 'section', reference: '', description: 'NUEVA SECCIÓN', units: 0, price: 0
+      id: crypto.randomUUID(),
+      type: 'section',
+      reference: '',
+      description: 'NUEVA SECCIÓN',
+      units: 0,
+      price: 0
     };
     updateBudget({ lineItems: [...budget.lineItems, newItem] });
   };
 
   const addProductAsLine = (product: Product) => {
     const newItem: LineItem = {
-      id: crypto.randomUUID(), type: 'product', productId: product.id, reference: product.reference, description: product.description, price: product.price, image: product.image, units: 1
+      id: crypto.randomUUID(),
+      type: 'product',
+      productId: product.id,
+      reference: product.reference,
+      description: product.description,
+      price: product.price,
+      image: product.image,
+      units: 1
     };
     updateBudget({ lineItems: [...budget.lineItems, newItem] });
   };
 
   const addKitAsLines = (kit: ProductKit) => {
       const section: LineItem = {
-          id: crypto.randomUUID(), type: 'section', reference: '', description: kit.reference.toUpperCase(), units: 0, price: 0
+          id: crypto.randomUUID(),
+          type: 'section',
+          reference: '',
+          description: kit.reference.toUpperCase(),
+          units: 0,
+          price: 0
       };
+
       const newItems: LineItem[] = [section];
+      
       kit.items.forEach(item => {
           const prod = products.find(p => p.id === item.productId);
           if (prod) {
               newItems.push({
-                  id: crypto.randomUUID(), type: 'product', productId: prod.id, reference: prod.reference, description: prod.description, price: prod.price, image: prod.image, units: item.units
+                  id: crypto.randomUUID(),
+                  type: 'product',
+                  productId: prod.id,
+                  reference: prod.reference,
+                  description: prod.description,
+                  price: prod.price,
+                  image: prod.image,
+                  units: item.units
               });
           }
       });
+
       updateBudget({ lineItems: [...budget.lineItems, ...newItems] });
   };
 
@@ -274,25 +303,17 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
   const taxAmount = taxableBase * (budget.taxPercentage / 100);
   const total = taxableBase + taxAmount;
 
-  const getTemplate = () => templates.find(t => t.id === selectedTemplateId) || templates[0];
-
   const handleGeneratePDF = () => {
     saveWithLogs();
-    const template = getTemplate();
-    if(!template) return alert("No hay plantilla seleccionada");
-    
-    const doc = generateBudgetPdf(budget, company, template);
+    const doc = generateBudgetPdf(budget, company, pdfConfig);
     const fileName = `Presupuesto_${budget.number}_${budget.clientData.commercialName}.pdf`;
     doc.save(fileName);
   };
 
   const handlePreview = () => {
     saveWithLogs();
-    const template = getTemplate();
-    if(!template) return alert("No hay plantilla seleccionada");
-
     try {
-      const doc = generateBudgetPdf(budget, company, template);
+      const doc = generateBudgetPdf(budget, company, pdfConfig);
       const blob = doc.output('blob');
       const url = URL.createObjectURL(blob);
       setPreviewUrl(url);
@@ -304,7 +325,9 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
   };
 
   const closePreview = () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
     setShowPreviewModal(false);
     setPreviewUrl(null);
   };
@@ -317,19 +340,27 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
       window.location.href = `mailto:${budget.clientData.email}?subject=${subject}&body=${body}`;
   };
 
+  // Filter products relevant to current system or marked as both
   const availableProducts = products.filter(p => !p.system || p.system === 'both' || p.system === currentSystem);
   const availableKits = kits.filter(k => !k.system || k.system === 'both' || k.system === currentSystem);
 
   const clientOptions = clients.map(c => ({
-    label: c.commercialName, value: c.id, subLabel: c.legalName
+    label: c.commercialName,
+    value: c.id,
+    subLabel: c.legalName
   }));
 
   const productOptions = availableProducts.map(p => ({
-    label: `${p.reference} - ${p.description.substring(0, 30)}...`, value: p.id, subLabel: `${p.price.toFixed(2)}€`, image: p.image
+    label: `${p.reference} - ${p.description.substring(0, 30)}...`,
+    value: p.id,
+    subLabel: `${p.price.toFixed(2)}€`,
+    image: p.image
   }));
 
   const kitOptions = availableKits.map(k => ({
-      label: `📦 PACK: ${k.reference}`, value: k.id, subLabel: k.description
+      label: `📦 PACK: ${k.reference}`,
+      value: k.id,
+      subLabel: k.description
   }));
 
   return (
@@ -353,69 +384,110 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
             </div>
           </div>
           <div className="flex items-center gap-2 w-full md:w-auto flex-wrap md:flex-nowrap">
-            
-            {/* Template Selector */}
-            <select 
-               className="bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-lg px-2 py-2 font-bold focus:outline-none focus:ring-2 focus:ring-slate-400"
-               value={selectedTemplateId}
-               onChange={(e) => setSelectedTemplateId(e.target.value)}
+            <button 
+               onClick={handleSendEmail}
+               className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-medium text-sm flex items-center gap-2"
+               title="Enviar Email al Cliente"
             >
-                {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-
-            <button onClick={handleSendEmail} className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-medium text-sm flex items-center gap-2" title="Enviar Email">
-                <MailIcon />
+                <MailIcon /> <span className="hidden md:inline">Email</span>
             </button>
-            <button onClick={handlePreview} className="flex-1 md:flex-none justify-center px-4 py-3 md:py-2 text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-sm flex items-center gap-2 font-medium text-sm">
+            <button 
+              onClick={handlePreview}
+              className="flex-1 md:flex-none justify-center px-4 py-3 md:py-2 text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-sm flex items-center gap-2 font-medium text-sm"
+            >
               <EyeIcon /> Vista Previa
             </button>
-            <button onClick={handleGeneratePDF} className={`flex-1 md:flex-none justify-center px-4 py-3 md:py-2 rounded-lg shadow-md flex items-center gap-2 font-medium text-sm transition-colors ${saveBtnColor}`}>
-              <SaveIcon /> PDF
+            <button 
+              onClick={handleGeneratePDF} 
+              className={`flex-1 md:flex-none justify-center px-4 py-3 md:py-2 rounded-lg shadow-md flex items-center gap-2 font-medium text-sm transition-colors ${saveBtnColor}`}
+            >
+              <SaveIcon /> Generar PDF
             </button>
           </div>
         </div>
 
         <div className="p-4 md:p-8 space-y-8 max-w-5xl mx-auto w-full">
           
+          {/* Top: Metadata Cards */}
           <section className="grid grid-cols-1 md:grid-cols-12 gap-6">
+            
+            {/* Client Card */}
             <div className="md:col-span-7 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2">Datos del Cliente</h3>
+                <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                  <svg className={`w-4 h-4 ${isSage ? 'text-[#00d061]' : 'text-red-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  Datos del Cliente
+                </h3>
                 <div className="w-full sm:w-64">
-                   <SearchableSelect options={clientOptions} value={budget.clientId} onChange={handleClientSelect} placeholder="Buscar cliente..."/>
+                   <SearchableSelect 
+                     options={clientOptions}
+                     value={budget.clientId}
+                     onChange={handleClientSelect}
+                     placeholder="Buscar cliente..."
+                   />
                 </div>
               </div>
+              
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-500 mb-1">Nombre Comercial</label>
-                  <input className="w-full bg-white border border-gray-300 text-slate-900 rounded-md text-sm p-2 focus:border-accent focus:ring-accent" value={budget.clientData.commercialName} onChange={e => updateBudget({ clientData: {...budget.clientData, commercialName: e.target.value} })} placeholder="Ej: Restaurante Pepe"/>
+                  <input 
+                    className="w-full bg-white border border-gray-300 text-slate-900 rounded-md text-sm p-2 focus:border-accent focus:ring-accent" 
+                    value={budget.clientData.commercialName} 
+                    onChange={e => updateBudget({ clientData: {...budget.clientData, commercialName: e.target.value} })}
+                    placeholder="Ej: Restaurante Pepe"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">Razón Social</label>
-                  <input className="w-full bg-white border border-gray-300 text-slate-900 rounded-md text-sm p-2" value={budget.clientData.legalName} onChange={e => updateBudget({ clientData: {...budget.clientData, legalName: e.target.value} })}/>
+                  <input 
+                    className="w-full bg-white border border-gray-300 text-slate-900 rounded-md text-sm p-2"
+                    value={budget.clientData.legalName} 
+                    onChange={e => updateBudget({ clientData: {...budget.clientData, legalName: e.target.value} })}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">CIF/NIF</label>
-                  <input className="w-full bg-white border border-gray-300 text-slate-900 rounded-md text-sm p-2" value={budget.clientData.cif} onChange={e => updateBudget({ clientData: {...budget.clientData, cif: e.target.value} })}/>
+                  <input 
+                    className="w-full bg-white border border-gray-300 text-slate-900 rounded-md text-sm p-2"
+                    value={budget.clientData.cif} 
+                    onChange={e => updateBudget({ clientData: {...budget.clientData, cif: e.target.value} })}
+                  />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-500 mb-1">Dirección</label>
-                  <input className="w-full bg-white border border-gray-300 text-slate-900 rounded-md text-sm p-2" value={budget.clientData.address} onChange={e => updateBudget({ clientData: {...budget.clientData, address: e.target.value} })}/>
+                  <input 
+                    className="w-full bg-white border border-gray-300 text-slate-900 rounded-md text-sm p-2"
+                    value={budget.clientData.address} 
+                    onChange={e => updateBudget({ clientData: {...budget.clientData, address: e.target.value} })}
+                  />
                 </div>
               </div>
             </div>
 
+            {/* Budget Settings Card */}
             <div className="md:col-span-5 bg-slate-50 p-5 rounded-xl border border-gray-200 shadow-sm">
-              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">Datos del Documento</h3>
+              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                Datos del Documento
+              </h3>
               <div className="space-y-4">
                 <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">Número</label>
-                    <input className="w-full bg-white border border-gray-300 text-slate-900 rounded-md font-mono text-sm p-2" value={budget.number} onChange={e => updateBudget({ number: e.target.value })} />
+                    <input 
+                      className="w-full bg-white border border-gray-300 text-slate-900 rounded-md font-mono text-sm p-2" 
+                      value={budget.number} 
+                      onChange={e => updateBudget({ number: e.target.value })} 
+                    />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                       <label className="block text-xs font-bold text-slate-500 mb-1">Estado</label>
-                      <select className="w-full bg-white border border-gray-300 text-slate-900 rounded-md text-sm p-2" value={budget.status} onChange={e => updateBudget({ status: e.target.value as any })}>
+                      <select 
+                        className="w-full bg-white border border-gray-300 text-slate-900 rounded-md text-sm p-2" 
+                        value={budget.status} 
+                        onChange={e => updateBudget({ status: e.target.value as any })}
+                      >
                         <option value="draft">Borrador</option>
                         <option value="pending">Pendiente</option>
                         <option value="accepted">Aceptado</option>
@@ -425,33 +497,64 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
                   <div>
                       <label className="block text-xs font-bold text-slate-500 mb-1">Validez</label>
                       <div className="relative">
-                        <input type="number" className="w-full bg-white border border-gray-300 text-slate-900 rounded-md text-sm pr-8 p-2" value={budget.validityDays} onChange={e => updateBudget({ validityDays: parseInt(e.target.value) })} />
+                        <input 
+                          type="number" 
+                          className="w-full bg-white border border-gray-300 text-slate-900 rounded-md text-sm pr-8 p-2" 
+                          value={budget.validityDays} 
+                          onChange={e => updateBudget({ validityDays: parseInt(e.target.value) })} 
+                        />
                         <span className="absolute right-2 top-2 text-xs text-slate-400">días</span>
                       </div>
                   </div>
                 </div>
                 <div>
                    <label className="block text-xs font-bold text-slate-500 mb-1">Comercial</label>
-                   <div className="bg-slate-100 rounded p-2 text-xs font-mono text-slate-600">{budget.creatorName || currentUser.name}</div>
+                   <div className="bg-slate-100 rounded p-2 text-xs font-mono text-slate-600">
+                       {budget.creatorName || currentUser.name}
+                   </div>
                 </div>
                 <div>
-                   <label className="block text-xs font-bold text-slate-500 mb-1">Notas Internas</label>
-                   <textarea className="w-full bg-white border border-gray-300 text-slate-900 rounded-md text-xs p-2 h-16 resize-none focus:border-accent focus:ring-accent" placeholder="Notas solo para la empresa..." value={budget.internalNotes || ''} onChange={e => updateBudget({ internalNotes: e.target.value })}/>
+                   <label className="block text-xs font-bold text-slate-500 mb-1">Notas Internas (Privado)</label>
+                   <textarea 
+                      className="w-full bg-white border border-gray-300 text-slate-900 rounded-md text-xs p-2 h-16 resize-none focus:border-accent focus:ring-accent"
+                      placeholder="Notas solo para la empresa..."
+                      value={budget.internalNotes || ''}
+                      onChange={e => updateBudget({ internalNotes: e.target.value })}
+                   />
                 </div>
               </div>
             </div>
           </section>
 
+          {/* Line Items Editor */}
           <section className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
             <div className="p-4 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <h3 className="text-lg font-bold text-slate-800">Conceptos y Productos</h3>
               <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
-                <button onClick={addSectionItem} className="flex-1 md:flex-none text-sm bg-white border border-slate-300 px-3 py-2 rounded-md hover:bg-slate-50 text-slate-700 font-medium shadow-sm">+ Sección</button>
+                <button onClick={addSectionItem} className="flex-1 md:flex-none text-sm bg-white border border-slate-300 px-3 py-2 rounded-md hover:bg-slate-50 text-slate-700 font-medium shadow-sm">
+                  + Sección
+                </button>
                 <div className="w-full md:w-48">
-                    <SearchableSelect options={kitOptions} value="" onChange={(val) => { const k = kits.find(kit => kit.id === val); if(k) addKitAsLines(k); }} placeholder="+ Añadir Pack..."/>
+                    <SearchableSelect 
+                        options={kitOptions}
+                        value=""
+                        onChange={(val) => {
+                             const k = kits.find(kit => kit.id === val);
+                             if(k) addKitAsLines(k);
+                        }}
+                        placeholder="+ Añadir Pack..."
+                    />
                 </div>
                 <div className="w-full md:w-64">
-                    <SearchableSelect options={productOptions} value="" onChange={(val) => { const p = products.find(prod => prod.id === val); if(p) addProductAsLine(p); }} placeholder="+ Añadir Producto..."/>
+                    <SearchableSelect 
+                        options={productOptions}
+                        value=""
+                        onChange={(val) => {
+                            const p = products.find(prod => prod.id === val);
+                            if(p) addProductAsLine(p);
+                        }}
+                        placeholder="+ Añadir Producto..."
+                    />
                 </div>
               </div>
             </div>
@@ -481,7 +584,12 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
                               </div>
                           </td>
                           <td colSpan={5} className="p-2">
-                            <input className="w-full bg-transparent font-bold text-slate-700 placeholder-slate-400 border-none focus:ring-0 uppercase tracking-wide p-2" placeholder="TÍTULO DE SECCIÓN" value={item.description} onChange={e => updateLineItem(item.id, { description: e.target.value })}/>
+                            <input 
+                              className="w-full bg-transparent font-bold text-slate-700 placeholder-slate-400 border-none focus:ring-0 uppercase tracking-wide p-2"
+                              placeholder="TÍTULO DE SECCIÓN"
+                              value={item.description}
+                              onChange={e => updateLineItem(item.id, { description: e.target.value })}
+                            />
                           </td>
                           <td className="p-2 text-center">
                             <button onClick={() => removeLineItem(item.id)} className="text-slate-400 hover:text-red-500 p-2"><TrashIcon/></button>
@@ -499,83 +607,168 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
                           </div>
                         </td>
                         <td className="p-2">
-                          <input className="w-full text-xs text-slate-700 bg-white border border-gray-200 rounded px-2 py-2" value={item.reference} onChange={e => updateLineItem(item.id, { reference: e.target.value })} placeholder="REF"/>
+                          <input className="w-full text-xs text-slate-700 bg-white border border-gray-200 rounded px-2 py-2" 
+                            value={item.reference} onChange={e => updateLineItem(item.id, { reference: e.target.value })} 
+                            placeholder="REF"
+                          />
                         </td>
                         <td className="p-2">
                           <div className="flex items-center gap-3">
-                            {item.image ? (<img src={item.image} className="w-10 h-10 object-cover rounded border border-gray-200 bg-white" />) : (<div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex items-center justify-center text-slate-300 text-xs flex-shrink-0">IMG</div>)}
-                            <textarea className="w-full text-slate-800 bg-white border border-gray-200 rounded px-2 py-2 resize-none h-auto min-h-[40px]" value={item.description} onChange={e => updateLineItem(item.id, { description: e.target.value })} rows={1}/>
+                            {item.image ? (
+                              <img src={item.image} className="w-10 h-10 object-cover rounded border border-gray-200 bg-white" />
+                            ) : (
+                              <div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex items-center justify-center text-slate-300 text-xs flex-shrink-0">IMG</div>
+                            )}
+                            <textarea className="w-full text-slate-800 bg-white border border-gray-200 rounded px-2 py-2 resize-none h-auto min-h-[40px]" 
+                              value={item.description} onChange={e => updateLineItem(item.id, { description: e.target.value })} 
+                              rows={1}
+                              placeholder="Descripción del producto"
+                            />
                           </div>
                         </td>
                         <td className="p-2">
-                          <input type="number" className="w-full text-right bg-white border border-gray-200 rounded text-slate-900 focus:border-accent focus:ring-accent p-2" value={item.units} onChange={e => updateLineItem(item.id, { units: parseFloat(e.target.value) })} />
+                          <input type="number" className="w-full text-right bg-white border border-gray-200 rounded text-slate-900 focus:border-accent focus:ring-accent p-2" 
+                            value={item.units} onChange={e => updateLineItem(item.id, { units: parseFloat(e.target.value) })} 
+                          />
                         </td>
                         <td className="p-2">
-                          <input type="number" className="w-full text-right bg-white border border-gray-200 rounded text-slate-900 focus:border-accent focus:ring-accent p-2" value={item.price} onChange={e => updateLineItem(item.id, { price: parseFloat(e.target.value) })} />
+                          <input type="number" className="w-full text-right bg-white border border-gray-200 rounded text-slate-900 focus:border-accent focus:ring-accent p-2" 
+                            value={item.price} onChange={e => updateLineItem(item.id, { price: parseFloat(e.target.value) })} 
+                          />
                         </td>
-                        <td className="p-2 text-right font-medium text-slate-900">{(item.units * item.price).toFixed(2)} €</td>
+                        <td className="p-2 text-right font-medium text-slate-900">
+                          {(item.units * item.price).toFixed(2)} €
+                        </td>
                         <td className="p-2 text-center">
                           <button onClick={() => removeLineItem(item.id)} className="text-slate-300 hover:text-red-500 p-2"><TrashIcon/></button>
                         </td>
                       </tr>
                     )
                   })}
-                  {budget.lineItems.length === 0 && (<tr><td colSpan={7} className="p-12 text-center text-slate-400 italic">No hay líneas. Añade productos o secciones.</td></tr>)}
+                  {budget.lineItems.length === 0 && (
+                    <tr><td colSpan={7} className="p-12 text-center text-slate-400 italic">No hay líneas. Añade productos o secciones.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </section>
 
+          {/* Footer Grid: Signature & Totals */}
           <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            {/* Left: Signature */}
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><PenIcon /> Firma Digital Cliente</h3>
-              <SignaturePad initial={budget.clientSignature} onSave={(data) => updateBudget({ clientSignature: data })} onClear={() => updateBudget({ clientSignature: undefined })}/>
+              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <PenIcon /> Firma Digital Cliente
+              </h3>
+              <SignaturePad 
+                initial={budget.clientSignature}
+                onSave={(data) => updateBudget({ clientSignature: data })}
+                onClear={() => updateBudget({ clientSignature: undefined })}
+              />
             </div>
 
+            {/* Right: Totals */}
             <div className="bg-slate-50 p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
-              <div className="flex justify-between text-sm text-slate-600"><span>Subtotal</span><span className="font-semibold text-slate-800">{subtotal.toFixed(2)} €</span></div>
+              <div className="flex justify-between text-sm text-slate-600">
+                <span>Subtotal</span>
+                <span className="font-semibold text-slate-800">{subtotal.toFixed(2)} €</span>
+              </div>
+              
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-600">Descuento (%)</span>
                 <div className="flex items-center gap-2">
-                  <input type="number" className="w-16 bg-white border border-gray-300 rounded text-right text-sm p-1" value={budget.discountPercentage} onChange={e => updateBudget({ discountPercentage: parseFloat(e.target.value) })}/>
+                  <input 
+                    type="number" className="w-16 bg-white border border-gray-300 rounded text-right text-sm p-1"
+                    value={budget.discountPercentage}
+                    onChange={e => updateBudget({ discountPercentage: parseFloat(e.target.value) })}
+                  />
                   <span className="text-red-500 w-20 text-right">-{discountAmount.toFixed(2)} €</span>
                 </div>
               </div>
+
               <div className="flex justify-between items-center text-sm">
                 <span className="text-green-700 font-medium">Bono / Subvención</span>
                 <div className="flex items-center gap-2">
-                  <input type="number" className="w-24 border-green-300 rounded text-right text-sm text-green-700 bg-white p-1" value={budget.bonusAmount} onChange={e => updateBudget({ bonusAmount: parseFloat(e.target.value) })}/>
+                  <input 
+                    type="number" className="w-24 border-green-300 rounded text-right text-sm text-green-700 bg-white p-1"
+                    value={budget.bonusAmount}
+                    onChange={e => updateBudget({ bonusAmount: parseFloat(e.target.value) })}
+                  />
                   <span className="text-green-700 w-12 text-right">€</span>
                 </div>
               </div>
+
               <div className="border-t border-gray-300 my-2"></div>
-              <div className="flex justify-between text-sm"><span className="text-slate-800 font-medium">Base Imponible</span><span className="font-bold">{taxableBase.toFixed(2)} €</span></div>
+
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-800 font-medium">Base Imponible</span>
+                <span className="font-bold">{taxableBase.toFixed(2)} €</span>
+              </div>
+
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-600">IVA</span>
                 <div className="flex items-center gap-2">
-                  <select className="w-16 bg-white border border-gray-300 rounded text-right text-sm p-1" value={budget.taxPercentage} onChange={e => updateBudget({ taxPercentage: parseFloat(e.target.value) })}><option value="21">21%</option><option value="10">10%</option><option value="4">4%</option><option value="0">0%</option></select>
+                  <select 
+                    className="w-16 bg-white border border-gray-300 rounded text-right text-sm p-1"
+                    value={budget.taxPercentage}
+                    onChange={e => updateBudget({ taxPercentage: parseFloat(e.target.value) })}
+                  >
+                    <option value="21">21%</option>
+                    <option value="10">10%</option>
+                    <option value="4">4%</option>
+                    <option value="0">0%</option>
+                  </select>
                   <span className="text-slate-600 w-20 text-right">+{taxAmount.toFixed(2)} €</span>
                 </div>
               </div>
+
               <div className="border-t border-slate-800 my-4"></div>
-              <div className="flex justify-between items-end"><span className="text-xl font-bold text-slate-900">TOTAL</span><span className={`text-3xl font-bold ${isSage ? 'text-[#00d061]' : 'text-red-600'}`}>{total.toFixed(2)} €</span></div>
+              
+              <div className="flex justify-between items-end">
+                <span className="text-xl font-bold text-slate-900">TOTAL</span>
+                <span className={`text-3xl font-bold ${isSage ? 'text-[#00d061]' : 'text-red-600'}`}>{total.toFixed(2)} €</span>
+              </div>
             </div>
           </section>
         </div>
       </div>
 
+      {/* Preview Modal */}
       {showPreviewModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-5xl h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-white z-10">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><EyeIcon /> Vista Previa</h3>
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <EyeIcon /> Vista Previa del Documento ({isSage ? 'Sage' : 'Ágora'})
+              </h3>
               <div className="flex gap-2">
-                <button onClick={handleGeneratePDF} className={`${saveBtnColor} px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2`}><DownloadIcon /> Descargar PDF</button>
-                <button onClick={closePreview} className="bg-gray-100 text-slate-600 px-3 py-2 rounded-lg hover:bg-gray-200"><XIcon /></button>
+                <button 
+                  onClick={handleGeneratePDF}
+                  className={`${saveBtnColor} px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2`}
+                >
+                  <DownloadIcon /> Descargar PDF
+                </button>
+                <button 
+                  onClick={closePreview}
+                  className="bg-gray-100 text-slate-600 px-3 py-2 rounded-lg hover:bg-gray-200"
+                >
+                  <XIcon />
+                </button>
               </div>
             </div>
             <div className="flex-1 bg-slate-100 relative">
-              {previewUrl ? (<iframe src={previewUrl} className="w-full h-full border-0" title="PDF Preview"/>) : (<div className="flex items-center justify-center h-full text-slate-400">Cargando...</div>)}
+              {previewUrl ? (
+                <iframe 
+                  src={previewUrl} 
+                  className="w-full h-full border-0" 
+                  title="PDF Preview"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-slate-400">
+                  Cargando vista previa...
+                </div>
+              )}
             </div>
           </div>
         </div>
