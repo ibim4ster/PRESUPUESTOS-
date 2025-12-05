@@ -1,6 +1,6 @@
 
 
-import { Budget, Client, CompanyProfile, PdfConfig, Product, CloudConfig, SystemType, PdfSystemConfig, ProductKit, User, LogEntry } from '../types';
+import { Budget, Client, CompanyProfile, Product, CloudConfig, SystemType, ProductKit, User, LogEntry, PdfTemplate, PdfConfig, PdfSystemConfig } from '../types';
 import { initializeApp, FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, 
@@ -19,56 +19,12 @@ const KEYS = {
   PRODUCTS: 'proquote_products',
   KITS: 'proquote_kits',
   COMPANY: 'proquote_company',
-  PDF_CONFIG: 'proquote_pdf_config_v2', 
+  TEMPLATES: 'proquote_pdf_templates',
   CLOUD_CONFIG: 'proquote_cloud_config',
   USERS: 'proquote_users',
-  LOGS: 'proquote_logs', // New Key
-  INIT: 'proquote_initialized_v6'
-};
-
-// --- LOGOS PRE-CARGADOS ---
-const LOGO_AGORA = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgNDAiPjx0ZXh0IHk9IjMwIiB4PSI1MCIgZmlsbD0iI2UzMDYxMyIgZm9udC1mYW1pbHk9ImFyaWFsIiBmb250LXdlaWdodD0iYm9sZCIgZm9udC1zaXplPSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+w6Fnb3JhPC90ZXh0Pjwvc3ZnPg==";
-const LOGO_CONCORD = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgNDAiPjx0ZXh0IHk9IjMwIiB4PSI1MCIgZmlsbD0iIzAwOTYzOSIgZm9udC1mYW1pbHk9ImFyaWFsIiBmb250LXdlaWdodD0iYm9sZCIgZm9udC1zaXplPSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Y29uY29yZDwvdGV4dD48L3N2Zz4=";
-const LOGO_CASHLOGY = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNTAgNDAiPjx0ZXh0IHk9IjMwIiB4PSI3NSIgZmlsbD0iI2ZmY2QwMCIgZm9udC1mYW1pbHk9ImFyaWFsIiBmb250LXdlaWdodD0iYm9sZCIgZm9udC1zaXplPSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Y2FzaGxvZ3k8L3RleHQ+PC9zdmc+";
-
-// DEFAULTS
-const DEFAULT_SYSTEM_CONFIG: PdfSystemConfig = {
-    primaryColor: '#000000',
-    secondaryColor: '#eeeeee',
-    showLogo: true, showCompanyDetails: true, showImages: true, showLegal: true, showSignatures: true, showPageNumbers: true, showQr: false,
-    titleText: 'PRESUPUESTO', footerText: 'Gracias por su confianza.',
-    legalTextIds: ['tax', 'payment'], customLegalTexts: [], partnerLogos: {}
-};
-
-const DEFAULT_PDF_CONFIG: PdfConfig = {
-    agora: {
-        ...DEFAULT_SYSTEM_CONFIG,
-        primaryColor: '#dc2626',
-        secondaryColor: '#f8fafc',
-        partnerLogos: {
-            slot1: LOGO_AGORA,
-            slot2: LOGO_CONCORD,
-            slot3: LOGO_CASHLOGY
-        }
-    },
-    sage: {
-        ...DEFAULT_SYSTEM_CONFIG,
-        primaryColor: '#000000',
-        secondaryColor: '#e6ffef',
-        partnerLogos: {} 
-    },
-    sage200: {
-        ...DEFAULT_SYSTEM_CONFIG,
-        primaryColor: '#000000',
-        secondaryColor: '#e6ffef',
-        partnerLogos: {} 
-    },
-    sagedespachos: {
-        ...DEFAULT_SYSTEM_CONFIG,
-        primaryColor: '#000000',
-        secondaryColor: '#e6ffef',
-        partnerLogos: {}
-    }
+  LOGS: 'proquote_logs',
+  PDF_CONFIG: 'proquote_pdf_config',
+  INIT: 'proquote_initialized_v7'
 };
 
 const DEFAULT_CLOUD_CONFIG: CloudConfig = {
@@ -100,7 +56,7 @@ const loadLocal = <T>(key: string, fallback: T): T => {
   }
 };
 
-// --- FIREBASE SYNC LOGIC (MODULAR SDK v9+) ---
+// --- FIREBASE SYNC LOGIC ---
 let app: FirebaseApp | undefined;
 let db: Firestore | null = null;
 let unsubscribeFunctions: Function[] = [];
@@ -126,18 +82,13 @@ const initFirebase = async () => {
             projectId: config.projectId
         });
     } catch (e: any) {
-        if (e.code === 'app/duplicate-app') {
-            // App already exists, we can ignore
-        } else {
-            throw e;
-        }
+        if (e.code === 'app/duplicate-app') {} else { throw e; }
     }
 
     if (app) {
         db = getFirestore(app);
         setupListeners();
     }
-    
   } catch (e) {
     console.error("Firebase Init Error", e);
   }
@@ -145,61 +96,37 @@ const initFirebase = async () => {
 
 const setupListeners = () => {
     if (!db) return;
-
-    // Lists
     startSync('budgets', KEYS.BUDGETS);
     startSync('clients', KEYS.CLIENTS);
     startSync('products', KEYS.PRODUCTS);
     startSync('kits', KEYS.KITS);
     startSync('users', KEYS.USERS);
-    startSync('logs', KEYS.LOGS); // Sync logs
+    startSync('logs', KEYS.LOGS);
+    startSync('templates', KEYS.TEMPLATES);
     
-    // Singletons
     startSyncSingleton('settings', 'company', KEYS.COMPANY);
-    
-    // PDF Config
-    const pdfRef = doc(db, 'settings', 'pdf');
-    const pdfUnsub = onSnapshot(pdfRef, (docSnap) => {
-        if (docSnap.exists()) {
-            const cloudData = docSnap.data() as PdfConfig;
-            const merged = { ...DEFAULT_PDF_CONFIG, ...cloudData };
-            saveLocal(KEYS.PDF_CONFIG, merged);
-            notify();
-        } else {
-            const local = loadLocal<PdfConfig>(KEYS.PDF_CONFIG, DEFAULT_PDF_CONFIG);
-            setDoc(pdfRef, local).catch(e => console.error("Error pushing pdf config", e));
-        }
-    });
-    unsubscribeFunctions.push(pdfUnsub);
+    startSyncSingleton('settings', 'pdf_config', KEYS.PDF_CONFIG);
 };
 
 const startSync = (collectionName: string, localKey: string) => {
   if (!db) return;
-  
   const colRef = collection(db, collectionName);
   const unsub = onSnapshot(colRef, (snapshot) => {
     const cloudData: any[] = [];
     snapshot.forEach(doc => cloudData.push(doc.data()));
-    
     if (cloudData.length > 0 || snapshot.size > 0) { 
         saveLocal(localKey, cloudData);
         notify();
     } else {
         const localData = loadLocal<any[]>(localKey, []);
-        if (localData.length > 0) {
-            localData.forEach(item => pushToCloud(collectionName, item));
-        }
+        if (localData.length > 0) localData.forEach(item => pushToCloud(collectionName, item));
     }
-  }, (error) => {
-      console.warn(`Sync warning for ${collectionName}:`, error.message);
   });
-  
   unsubscribeFunctions.push(unsub);
 };
 
 const startSyncSingleton = (collectionName: string, docId: string, localKey: string) => {
     if (!db) return;
-
     const docRef = doc(db, collectionName, docId);
     const unsub = onSnapshot(docRef, (docSnap) => {
         if (docSnap.exists()) {
@@ -207,33 +134,20 @@ const startSyncSingleton = (collectionName: string, docId: string, localKey: str
             notify();
         } else {
             const local = loadLocal(localKey, null);
-            if(local) {
-                setDoc(docRef, local).catch(e => console.error("Error pushing singleton:", e));
-            }
+            if(local) setDoc(docRef, local).catch(e => console.error(e));
         }
-    }, (error) => {
-        console.warn(`Sync warning for ${collectionName}/${docId}:`, error.message);
     });
-
     unsubscribeFunctions.push(unsub);
 };
 
 const pushToCloud = async (collectionName: string, item: any) => {
   if (!db) return;
-  try {
-    await setDoc(doc(db, collectionName, item.id), item);
-  } catch (e) {
-    console.error(`Cloud Push Error (${collectionName})`, e);
-  }
+  try { await setDoc(doc(db, collectionName, item.id), item); } catch (e) {}
 };
 
 const deleteFromCloud = async (collectionName: string, id: string) => {
     if (!db) return;
-    try {
-        await deleteDoc(doc(db, collectionName, id));
-    } catch(e) {
-        console.error("Cloud Delete Error", e);
-    }
+    try { await deleteDoc(doc(db, collectionName, id)); } catch(e) {}
 };
 
 
@@ -251,10 +165,42 @@ export const storageService = {
     initFirebase();
 
     if (initVersion !== KEYS.INIT) {
-        const currentPdf = loadLocal<PdfConfig>(KEYS.PDF_CONFIG, DEFAULT_PDF_CONFIG);
-        const mergedPdf = { ...DEFAULT_PDF_CONFIG, ...currentPdf };
-        saveLocal(KEYS.PDF_CONFIG, mergedPdf);
-        
+        // Seed Default Templates if none
+        const templates = loadLocal<PdfTemplate[]>(KEYS.TEMPLATES, []);
+        if (templates.length === 0) {
+            const defaultTemplates: PdfTemplate[] = [
+                {
+                    id: 'tpl-modern', name: 'Corporativo Moderno', isDefault: true,
+                    layout: 'modern', font: 'helvetica',
+                    primaryColor: '#0f172a', secondaryColor: '#f1f5f9', textColor: '#334155',
+                    showLogo: true, showCompanyDetails: true, showClientDetails: true, showImages: true,
+                    showLegal: true, showSignatures: true, showPageNumbers: true, showQr: false,
+                    titleText: 'PRESUPUESTO', footerText: 'Gracias por su confianza.',
+                    headerHeight: 40, margins: 15
+                },
+                {
+                    id: 'tpl-minimal', name: 'Minimalista Elegante', isDefault: false,
+                    layout: 'minimal', font: 'helvetica',
+                    primaryColor: '#000000', secondaryColor: '#ffffff', textColor: '#000000',
+                    showLogo: true, showCompanyDetails: true, showClientDetails: true, showImages: false,
+                    showLegal: true, showSignatures: true, showPageNumbers: true, showQr: false,
+                    titleText: 'PROPUESTA COMERCIAL', footerText: '',
+                    headerHeight: 30, margins: 20
+                },
+                {
+                    id: 'tpl-classic', name: 'Clásico Ejecutivo', isDefault: false,
+                    layout: 'classic', font: 'times',
+                    primaryColor: '#1e3a8a', secondaryColor: '#eff6ff', textColor: '#1e293b',
+                    showLogo: true, showCompanyDetails: true, showClientDetails: true, showImages: true,
+                    showLegal: true, showSignatures: true, showPageNumbers: true, showQr: false,
+                    titleText: 'PRESUPUESTO', footerText: 'Documento generado electrónicamente.',
+                    headerHeight: 50, margins: 15
+                }
+            ];
+            saveLocal(KEYS.TEMPLATES, defaultTemplates);
+            defaultTemplates.forEach(t => pushToCloud('templates', t));
+        }
+
         if (!loadLocal(KEYS.CLIENTS, null)) {
              const mockClients: Client[] = [
                 { id: '1', commercialName: 'Restaurante El Puerto', legalName: 'Gastronomía del Mar S.L.', cif: 'B12345678', address: 'Av. Marítima 45, Valencia', email: 'info@elpuerto.com', phone: '960123456', paymentMethod: 'Transferencia' }
@@ -265,17 +211,13 @@ export const storageService = {
         localStorage.setItem(KEYS.INIT, KEYS.INIT);
     }
 
-    // CHECK USERS - CREATE DEFAULT ADMIN IF NONE EXIST
+    // CHECK USERS - CREATE DEFAULT ADMIN
     const users = loadLocal<User[]>(KEYS.USERS, []);
     if (users.length === 0) {
         const adminHash = await authService.hashPassword('LSSlss0711');
         const adminUser: User = {
-            id: 'admin-001',
-            username: 'admin',
-            name: 'Super Administrator',
-            role: 'admin',
-            passwordHash: adminHash,
-            createdAt: new Date().toISOString()
+            id: 'admin-001', username: 'admin', name: 'Super Administrator', role: 'admin',
+            passwordHash: adminHash, createdAt: new Date().toISOString()
         };
         saveLocal(KEYS.USERS, [adminUser]);
         pushToCloud('users', adminUser);
@@ -291,12 +233,11 @@ export const storageService = {
           await deleteDoc(testRef);
           return { success: true, message: "Conexión exitosa. Sincronización activa." };
       } catch (e: any) {
-          if (e.code === 'permission-denied') return { success: false, message: "Error de Permisos: Habilita 'Test Mode' en Firebase Console." };
+          if (e.code === 'permission-denied') return { success: false, message: "Error de Permisos." };
           return { success: false, message: `Error: ${e.message}` };
       }
   },
 
-  // --- LOGGING ---
   addLog: (entry: Partial<LogEntry>) => {
       const logs = storageService.getLogs();
       const newEntry: LogEntry = {
@@ -307,28 +248,21 @@ export const storageService = {
           action: entry.action || 'UNKNOWN',
           details: entry.details || ''
       };
-      
-      // Keep only last 200 logs locally to avoid storage bloat
       if (logs.length > 200) logs.pop();
       logs.unshift(newEntry);
-      
       saveLocal(KEYS.LOGS, logs);
       pushToCloud('logs', newEntry);
-      // No notify needed for logs usually, but let's do it for realtime admin
       notify();
   },
 
   getLogs: () => loadLocal<LogEntry[]>(KEYS.LOGS, []),
-
-  // --- ENTITY GETTERS/SETTERS ---
 
   // USERS
   getUsers: () => loadLocal<User[]>(KEYS.USERS, []),
   saveUser: (user: User) => {
     const users = storageService.getUsers();
     const index = users.findIndex(u => u.id === user.id);
-    if (index >= 0) users[index] = user;
-    else users.push(user);
+    if (index >= 0) users[index] = user; else users.push(user);
     saveLocal(KEYS.USERS, users);
     pushToCloud('users', user);
     notify();
@@ -345,9 +279,7 @@ export const storageService = {
   saveBudget: (budget: Budget) => {
     const budgets = storageService.getBudgets();
     const index = budgets.findIndex(b => b.id === budget.id);
-    if (index >= 0) budgets[index] = budget;
-    else budgets.push(budget);
-    
+    if (index >= 0) budgets[index] = budget; else budgets.push(budget);
     saveLocal(KEYS.BUDGETS, budgets);
     pushToCloud('budgets', budget); 
     notify();
@@ -376,9 +308,7 @@ export const storageService = {
   saveClient: (client: Client) => {
     const clients = storageService.getClients();
     const index = clients.findIndex(c => c.id === client.id);
-    if (index >= 0) clients[index] = client;
-    else clients.push(client);
-    
+    if (index >= 0) clients[index] = client; else clients.push(client);
     saveLocal(KEYS.CLIENTS, clients);
     pushToCloud('clients', client);
     notify();
@@ -389,14 +319,12 @@ export const storageService = {
     notify();
   },
 
-  // PRODUCTS
+  // PRODUCTS & KITS
   getProducts: () => loadLocal<Product[]>(KEYS.PRODUCTS, []),
   saveProduct: (product: Product) => {
     const products = storageService.getProducts();
     const index = products.findIndex(p => p.id === product.id);
-    if (index >= 0) products[index] = product;
-    else products.push(product);
-    
+    if (index >= 0) products[index] = product; else products.push(product);
     saveLocal(KEYS.PRODUCTS, products);
     pushToCloud('products', product);
     notify();
@@ -407,14 +335,11 @@ export const storageService = {
     notify();
   },
 
-  // KITS
   getProductKits: () => loadLocal<ProductKit[]>(KEYS.KITS, []),
   saveProductKit: (kit: ProductKit) => {
     const kits = storageService.getProductKits();
     const index = kits.findIndex(k => k.id === kit.id);
-    if (index >= 0) kits[index] = kit;
-    else kits.push(kit);
-    
+    if (index >= 0) kits[index] = kit; else kits.push(kit);
     saveLocal(KEYS.KITS, kits);
     pushToCloud('kits', kit);
     notify();
@@ -425,26 +350,58 @@ export const storageService = {
     notify();
   },
 
-  // CONFIGS
-  getCompanyProfile: () => loadLocal<CompanyProfile>(KEYS.COMPANY, { name: '', cif: '', address: '', email: '', phone: '', terms: '' }),
-  saveCompanyProfile: (profile: CompanyProfile) => {
-      saveLocal(KEYS.COMPANY, profile);
-      if (db) setDoc(doc(db, 'settings', 'company'), profile).catch(e => console.error("Cloud Error", e));
+  // TEMPLATES (NEW)
+  getTemplates: () => loadLocal<PdfTemplate[]>(KEYS.TEMPLATES, []),
+  saveTemplate: (template: PdfTemplate) => {
+      const templates = storageService.getTemplates();
+      // If setting default, unset others
+      if(template.isDefault) {
+          templates.forEach(t => { if(t.id !== template.id) t.isDefault = false; });
+      }
+      const index = templates.findIndex(t => t.id === template.id);
+      if(index >= 0) templates[index] = template; else templates.push(template);
+      saveLocal(KEYS.TEMPLATES, templates);
+      pushToCloud('templates', template);
+      notify();
+  },
+  deleteTemplate: (id: string) => {
+      const templates = storageService.getTemplates();
+      if(templates.length <= 1) return; // Prevent deleting last template
+      const filtered = templates.filter(t => t.id !== id);
+      saveLocal(KEYS.TEMPLATES, filtered);
+      deleteFromCloud('templates', id);
       notify();
   },
 
-  getPdfConfig: () => {
-      const config = loadLocal<PdfConfig>(KEYS.PDF_CONFIG, DEFAULT_PDF_CONFIG);
-      // Fallback merge for backward compatibility
-      if(!config.sage200) config.sage200 = DEFAULT_PDF_CONFIG.sage200;
-      if(!config.sagedespachos) config.sagedespachos = DEFAULT_PDF_CONFIG.sagedespachos;
-      return config;
+  // SETTINGS
+  getCompanyProfile: () => loadLocal<CompanyProfile>(KEYS.COMPANY, { name: '', cif: '', address: '', email: '', phone: '', terms: '' }),
+  saveCompanyProfile: (profile: CompanyProfile) => {
+      saveLocal(KEYS.COMPANY, profile);
+      if (db) setDoc(doc(db, 'settings', 'company'), profile).catch(e => console.error(e));
+      notify();
+  },
+  
+  getPdfConfig: (): PdfConfig => {
+      const defaultSys: PdfSystemConfig = {
+          primaryColor: '#000000',
+          secondaryColor: '#ffffff',
+          titleText: 'PRESUPUESTO',
+          showLogo: true, showCompanyDetails: true, showImages: true,
+          showLegal: true, showSignatures: true, showPageNumbers: true, showQr: false,
+          legalTextIds: [], customLegalTexts: [], footerText: '',
+          partnerLogos: {}
+      };
+      const defaults: PdfConfig = {
+          agora: { ...defaultSys, primaryColor: '#dc2626' },
+          sage: { ...defaultSys, primaryColor: '#00d061' },
+          sage200: { ...defaultSys, primaryColor: '#00d061' },
+          sagedespachos: { ...defaultSys, primaryColor: '#00d061' }
+      };
+      return loadLocal(KEYS.PDF_CONFIG, defaults);
   },
   savePdfConfig: (config: PdfConfig) => {
       saveLocal(KEYS.PDF_CONFIG, config);
-      if (db) {
-          setDoc(doc(db, 'settings', 'pdf'), config).catch(e => console.error("Cloud Error", e));
-      }
+      if(db) setDoc(doc(db, 'settings', 'pdf_config'), config).catch(e => console.error(e));
       notify();
   },
   
@@ -462,9 +419,10 @@ export const storageService = {
       products: storageService.getProducts(),
       kits: storageService.getProductKits(),
       company: storageService.getCompanyProfile(),
-      pdfConfig: storageService.getPdfConfig(),
+      templates: storageService.getTemplates(),
       users: storageService.getUsers(),
-      logs: storageService.getLogs()
+      logs: storageService.getLogs(),
+      pdfConfig: storageService.getPdfConfig()
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -482,9 +440,10 @@ export const storageService = {
       if(data.products) saveLocal(KEYS.PRODUCTS, data.products);
       if(data.kits) saveLocal(KEYS.KITS, data.kits);
       if(data.company) saveLocal(KEYS.COMPANY, data.company);
-      if(data.pdfConfig) saveLocal(KEYS.PDF_CONFIG, data.pdfConfig);
+      if(data.templates) saveLocal(KEYS.TEMPLATES, data.templates);
       if(data.users) saveLocal(KEYS.USERS, data.users);
       if(data.logs) saveLocal(KEYS.LOGS, data.logs);
+      if(data.pdfConfig) saveLocal(KEYS.PDF_CONFIG, data.pdfConfig);
       notify();
       return true;
     } catch(e) { return false; }
