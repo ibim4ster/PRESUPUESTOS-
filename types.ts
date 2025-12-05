@@ -1,6 +1,17 @@
 
 export type SystemType = 'agora' | 'sage' | 'sage200' | 'sagedespachos';
 
+export type UserRole = 'admin' | 'commercial';
+
+export interface User {
+  id: string;
+  username: string;
+  passwordHash: string;
+  name: string;
+  role: UserRole;
+  createdAt: string;
+}
+
 export interface Product {
   id: string;
   reference: string;

@@ -1,5 +1,5 @@
 
-import { Budget, Client, CompanyProfile, PdfConfig, Product, CloudConfig, SystemType, PdfSystemConfig, ProductKit } from '../types';
+import { Budget, Client, CompanyProfile, PdfConfig, Product, CloudConfig, SystemType, PdfSystemConfig, ProductKit, User } from '../types';
 import { initializeApp, FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, 
@@ -10,6 +10,7 @@ import {
   onSnapshot, 
   Firestore 
 } from 'firebase/firestore';
+import { authService } from './auth';
 
 const KEYS = {
   BUDGETS: 'proquote_budgets',
@@ -19,7 +20,8 @@ const KEYS = {
   COMPANY: 'proquote_company',
   PDF_CONFIG: 'proquote_pdf_config_v2', 
   CLOUD_CONFIG: 'proquote_cloud_config',
-  INIT: 'proquote_initialized_v5'
+  USERS: 'proquote_users',
+  INIT: 'proquote_initialized_v6' // Incremented version
 };
 
 // --- LOGOS PRE-CARGADOS ---
@@ -149,6 +151,7 @@ const setupListeners = () => {
     startSync('clients', KEYS.CLIENTS);
     startSync('products', KEYS.PRODUCTS);
     startSync('kits', KEYS.KITS);
+    startSync('users', KEYS.USERS);
     
     // Singletons
     startSyncSingleton('settings', 'company', KEYS.COMPANY);
@@ -245,11 +248,11 @@ export const storageService = {
     };
   },
 
-  checkAndSeedData: () => {
+  checkAndSeedData: async () => {
     const initVersion = localStorage.getItem(KEYS.INIT);
     initFirebase();
 
-    if (initVersion !== 'proquote_initialized_v5') {
+    if (initVersion !== KEYS.INIT) {
         // Reset config to new structure on upgrade
         const currentPdf = loadLocal<PdfConfig>(KEYS.PDF_CONFIG, DEFAULT_PDF_CONFIG);
         const mergedPdf = { ...DEFAULT_PDF_CONFIG, ...currentPdf };
@@ -262,7 +265,25 @@ export const storageService = {
             saveLocal(KEYS.CLIENTS, mockClients);
         }
 
-        localStorage.setItem(KEYS.INIT, 'proquote_initialized_v5');
+        localStorage.setItem(KEYS.INIT, KEYS.INIT);
+    }
+
+    // CHECK USERS - CREATE DEFAULT ADMIN IF NONE EXIST
+    const users = loadLocal<User[]>(KEYS.USERS, []);
+    if (users.length === 0) {
+        console.log("Seeding default admin...");
+        const adminHash = await authService.hashPassword('LSSlss0711');
+        const adminUser: User = {
+            id: 'admin-001',
+            username: 'admin',
+            name: 'Super Administrator',
+            role: 'admin',
+            passwordHash: adminHash,
+            createdAt: new Date().toISOString()
+        };
+        saveLocal(KEYS.USERS, [adminUser]);
+        pushToCloud('users', adminUser);
+        notify();
     }
   },
 
@@ -279,6 +300,27 @@ export const storageService = {
       }
   },
 
+  // --- ENTITY GETTERS/SETTERS ---
+
+  // USERS
+  getUsers: () => loadLocal<User[]>(KEYS.USERS, []),
+  saveUser: (user: User) => {
+    const users = storageService.getUsers();
+    const index = users.findIndex(u => u.id === user.id);
+    if (index >= 0) users[index] = user;
+    else users.push(user);
+    saveLocal(KEYS.USERS, users);
+    pushToCloud('users', user);
+    notify();
+  },
+  deleteUser: (id: string) => {
+    const users = storageService.getUsers().filter(u => u.id !== id);
+    saveLocal(KEYS.USERS, users);
+    deleteFromCloud('users', id);
+    notify();
+  },
+
+  // BUDGETS
   getBudgets: () => loadLocal<Budget[]>(KEYS.BUDGETS, []),
   saveBudget: (budget: Budget) => {
     const budgets = storageService.getBudgets();
@@ -309,6 +351,7 @@ export const storageService = {
     return `${prefix}${next.toString().padStart(3, '0')}`;
   },
 
+  // CLIENTS
   getClients: () => loadLocal<Client[]>(KEYS.CLIENTS, []),
   saveClient: (client: Client) => {
     const clients = storageService.getClients();
@@ -326,6 +369,7 @@ export const storageService = {
     notify();
   },
 
+  // PRODUCTS
   getProducts: () => loadLocal<Product[]>(KEYS.PRODUCTS, []),
   saveProduct: (product: Product) => {
     const products = storageService.getProducts();
@@ -343,6 +387,7 @@ export const storageService = {
     notify();
   },
 
+  // KITS
   getProductKits: () => loadLocal<ProductKit[]>(KEYS.KITS, []),
   saveProductKit: (kit: ProductKit) => {
     const kits = storageService.getProductKits();
@@ -360,6 +405,7 @@ export const storageService = {
     notify();
   },
 
+  // CONFIGS
   getCompanyProfile: () => loadLocal<CompanyProfile>(KEYS.COMPANY, { name: '', cif: '', address: '', email: '', phone: '', terms: '' }),
   saveCompanyProfile: (profile: CompanyProfile) => {
       saveLocal(KEYS.COMPANY, profile);
@@ -388,6 +434,7 @@ export const storageService = {
       initFirebase(); 
   },
 
+  // IO
   exportData: () => {
     const data = {
       budgets: storageService.getBudgets(),
@@ -395,7 +442,8 @@ export const storageService = {
       products: storageService.getProducts(),
       kits: storageService.getProductKits(),
       company: storageService.getCompanyProfile(),
-      pdfConfig: storageService.getPdfConfig()
+      pdfConfig: storageService.getPdfConfig(),
+      users: storageService.getUsers()
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -414,6 +462,7 @@ export const storageService = {
       if(data.kits) saveLocal(KEYS.KITS, data.kits);
       if(data.company) saveLocal(KEYS.COMPANY, data.company);
       if(data.pdfConfig) saveLocal(KEYS.PDF_CONFIG, data.pdfConfig);
+      if(data.users) saveLocal(KEYS.USERS, data.users);
       notify();
       return true;
     } catch(e) { return false; }

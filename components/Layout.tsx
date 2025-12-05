@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
-import { SystemType } from '../types';
+import { SystemType, User } from '../types';
+import { authService } from '../services/auth';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -8,6 +9,8 @@ interface LayoutProps {
   onNavigate: (view: string) => void;
   currentSystem: SystemType;
   onSystemChange: (system: SystemType) => void;
+  user: User;
+  onLogout: () => void;
 }
 
 // Icons components
@@ -19,14 +22,18 @@ const PackageIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" hei
 const SettingsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>;
 const MenuIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>;
 const CloseIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+const ShieldIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+const LogOutIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
 
-const NavItem = ({ id, label, icon: Icon, active, onClick }: any) => (
+const NavItem = ({ id, label, icon: Icon, active, onClick, highlight = false }: any) => (
   <button
     onClick={() => onClick(id)}
     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
       active 
         ? 'bg-white/10 text-white shadow-sm' 
-        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+        : highlight 
+            ? 'text-red-300 hover:bg-white/5 hover:text-white'
+            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
     }`}
   >
     <Icon />
@@ -34,7 +41,7 @@ const NavItem = ({ id, label, icon: Icon, active, onClick }: any) => (
   </button>
 );
 
-export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate, currentSystem, onSystemChange }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate, currentSystem, onSystemChange, user, onLogout }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleNavClick = (view: string) => {
@@ -87,8 +94,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate
             <span>Gravity</span>
           </h1>
           
+          <div className="mt-4 flex items-center gap-2 bg-white/5 p-2 rounded-lg border border-white/10">
+             <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center text-xs font-bold text-white">
+                 {user.name.charAt(0).toUpperCase()}
+             </div>
+             <div className="overflow-hidden">
+                 <div className="text-xs font-bold truncate">{user.name}</div>
+                 <div className="text-[10px] text-slate-400 capitalize">{user.role === 'admin' ? 'Administrador' : 'Comercial'}</div>
+             </div>
+          </div>
+
           {/* System Switcher Dropdown */}
-          <div className="mt-6">
+          <div className="mt-4">
              <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Sistema Activo</label>
              <div className="relative">
                 <select 
@@ -151,18 +168,32 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate
             active={activeView === 'settings'} 
             onClick={handleNavClick} 
           />
+          
+          {authService.isAdmin(user) && (
+             <>
+             <div className="pt-4 pb-2 border-t border-white/10 mt-4">
+                 <p className="px-4 text-[10px] font-bold text-slate-500 uppercase">Administración</p>
+             </div>
+             <NavItem 
+                id="admin-panel" 
+                label="Gestión Usuarios" 
+                icon={ShieldIcon} 
+                active={activeView === 'admin-panel'} 
+                onClick={handleNavClick}
+                highlight={true}
+             />
+             </>
+          )}
         </nav>
 
         <div className="p-4 border-t border-white/10">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold ring-2 ring-white/20">
-              GR
-            </div>
-            <div className="text-sm">
-              <div className="font-medium text-slate-200">Sistema Activo</div>
-              <div className={`text-xs ${accentText} font-bold uppercase`}>{systemLabel[currentSystem]}</div>
-            </div>
-          </div>
+          <button 
+             onClick={onLogout}
+             className="w-full flex items-center justify-center space-x-2 p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+          >
+             <LogOutIcon />
+             <span className="text-xs font-bold uppercase">Cerrar Sesión</span>
+          </button>
         </div>
       </aside>
 
