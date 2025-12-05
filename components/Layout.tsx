@@ -42,10 +42,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate
     setIsMobileMenuOpen(false); // Close menu on selection
   };
 
-  const isSage = currentSystem === 'sage';
+  const isSage = currentSystem.startsWith('sage');
   const themeColor = isSage ? 'bg-black' : 'bg-slate-900';
   const accentColor = isSage ? 'bg-[#00d061]' : 'bg-red-600';
   const accentText = isSage ? 'text-[#00d061]' : 'text-red-500';
+
+  const systemLabel = {
+    agora: 'Ágora',
+    sage: 'Sage 50',
+    sage200: 'Sage 200',
+    sagedespachos: 'Sage Despachos'
+  };
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -53,8 +60,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate
       {/* Mobile Header */}
       <div className={`lg:hidden fixed top-0 left-0 right-0 h-16 ${themeColor} text-white z-30 flex items-center justify-between px-4 shadow-md transition-colors duration-300`}>
         <div className="flex items-center gap-2">
-            <div className={`w-8 h-8 ${accentColor} rounded-lg flex items-center justify-center text-white text-lg font-bold`}>P</div>
-            <span className="font-bold text-lg">ProQuote</span>
+            <div className={`w-8 h-8 ${accentColor} rounded-lg flex items-center justify-center text-white text-lg font-bold`}>G</div>
+            <span className="font-bold text-lg">Gravity</span>
         </div>
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2">
            {isMobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
@@ -76,24 +83,28 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate
       `}>
         <div className="p-6 border-b border-white/10">
           <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            <div className={`w-8 h-8 ${accentColor} rounded-lg flex items-center justify-center text-white text-lg transition-colors duration-300`}>P</div>
-            <span>ProQuote</span>
+            <div className={`w-8 h-8 ${accentColor} rounded-lg flex items-center justify-center text-white text-lg transition-colors duration-300`}>G</div>
+            <span>Gravity</span>
           </h1>
           
-          {/* System Switcher */}
-          <div className="mt-6 bg-black/30 p-1 rounded-lg flex">
-             <button 
-                onClick={() => onSystemChange('agora')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${!isSage ? 'bg-red-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-             >
-                ÁGORA
-             </button>
-             <button 
-                onClick={() => onSystemChange('sage')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${isSage ? 'bg-[#00d061] text-black shadow' : 'text-slate-400 hover:text-white'}`}
-             >
-                SAGE 50
-             </button>
+          {/* System Switcher Dropdown */}
+          <div className="mt-6">
+             <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Sistema Activo</label>
+             <div className="relative">
+                <select 
+                    value={currentSystem}
+                    onChange={(e) => onSystemChange(e.target.value as SystemType)}
+                    className="w-full bg-white/10 border border-white/20 rounded-lg p-2.5 text-sm font-bold text-white appearance-none cursor-pointer hover:bg-white/20 transition-colors focus:ring-2 focus:ring-[#00d061] outline-none"
+                >
+                    <option value="agora" className="text-slate-900 font-bold">ÁGORA</option>
+                    <option value="sage" className="text-slate-900 font-bold">SAGE 50</option>
+                    <option value="sage200" className="text-slate-900 font-bold">SAGE 200</option>
+                    <option value="sagedespachos" className="text-slate-900 font-bold">SAGE DESPACHOS</option>
+                </select>
+                <div className="absolute right-3 top-3 pointer-events-none">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
+                </div>
+             </div>
           </div>
         </div>
         
@@ -145,11 +156,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate
         <div className="p-4 border-t border-white/10">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold ring-2 ring-white/20">
-              PQ
+              GR
             </div>
             <div className="text-sm">
               <div className="font-medium text-slate-200">Sistema Activo</div>
-              <div className={`text-xs ${accentText} font-bold uppercase`}>{isSage ? 'Sage 50' : 'Ágora'}</div>
+              <div className={`text-xs ${accentText} font-bold uppercase`}>{systemLabel[currentSystem]}</div>
             </div>
           </div>
         </div>

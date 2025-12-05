@@ -6,12 +6,15 @@ import { Budget, CompanyProfile, PdfConfig, DEFAULT_LEGAL_TEXTS } from '../types
 export const generateBudgetPdf = (
   budget: Budget,
   company: CompanyProfile,
-  config: PdfConfig
+  fullConfig: PdfConfig
 ) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
   
+  // SELECT CORRECT CONFIG BASED ON SYSTEM
+  const config = fullConfig[budget.system] || fullConfig.agora;
+
   // --- UTILS ---
   const hexToRgb = (hex: string): [number, number, number] => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -22,13 +25,8 @@ export const generateBudgetPdf = (
     ] : [0, 0, 0];
   };
 
-  // Determine colors based on system
-  const isSage = budget.system === 'sage';
-  const primaryColorHex = isSage ? config.sagePrimaryColor || '#000000' : config.primaryColor;
-  const secondaryColorHex = isSage ? config.sageSecondaryColor || '#e6ffef' : config.secondaryColor;
-
-  const primaryRgb = hexToRgb(primaryColorHex);
-  const secondaryRgb = hexToRgb(secondaryColorHex);
+  const primaryRgb = hexToRgb(config.primaryColor);
+  const secondaryRgb = hexToRgb(config.secondaryColor);
   
   // --- HEADER DESIGN ---
   // Top Color Bar
@@ -141,7 +139,7 @@ export const generateBudgetPdf = (
         colSpan: config.showImages ? 5 : 4, 
         styles: { 
           fontStyle: 'bold' as const, 
-          fillColor: secondaryRgb, // Use secondary theme color for sections
+          fillColor: secondaryRgb, 
           textColor: primaryRgb,
           halign: 'left' as const,
           cellPadding: { top: 3, bottom: 3, left: 5 }
@@ -355,8 +353,6 @@ export const generateBudgetPdf = (
       activeLogos.forEach(logo => {
           if (logo) {
             try {
-                // If it's Sage, we might want to filter logs or change appearance?
-                // For now, keep standard logos
                 doc.addImage(logo, 'PNG', startX, footerY - 5, w, logoH, undefined, 'FAST');
                 startX += w + gap;
             } catch (e) {}

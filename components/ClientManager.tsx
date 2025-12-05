@@ -43,6 +43,8 @@ export const ClientManager: React.FC = () => {
     setFormData({ id: '', commercialName: '', legalName: '', cif: '', address: '', email: '', phone: '', paymentMethod: 'Transferencia' });
   };
 
+  const inputClass = "border border-gray-300 p-2 rounded w-full bg-white text-slate-900 focus:ring-2 focus:ring-slate-400 focus:border-transparent outline-none";
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-primary">Gestión de Clientes</h2>
@@ -52,27 +54,27 @@ export const ClientManager: React.FC = () => {
         <h3 className="text-lg font-medium mb-4">{editingId ? 'Editar Cliente' : 'Nuevo Cliente'}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <input 
-            className="border p-2 rounded" placeholder="Nombre Comercial" 
+            className={inputClass} placeholder="Nombre Comercial" 
             value={formData.commercialName} onChange={e => setFormData({...formData, commercialName: e.target.value})} 
           />
           <input 
-            className="border p-2 rounded" placeholder="Razón Social (Legal)" 
+            className={inputClass} placeholder="Razón Social (Legal)" 
             value={formData.legalName} onChange={e => setFormData({...formData, legalName: e.target.value})} 
           />
           <input 
-            className="border p-2 rounded" placeholder="CIF / NIF" 
+            className={inputClass} placeholder="CIF / NIF" 
             value={formData.cif} onChange={e => setFormData({...formData, cif: e.target.value})} 
           />
           <input 
-            className="border p-2 rounded" placeholder="Teléfono" 
+            className={inputClass} placeholder="Teléfono" 
             value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} 
           />
           <input 
-            className="border p-2 rounded" placeholder="Email" type="email"
+            className={inputClass} placeholder="Email" type="email"
             value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} 
           />
           <select 
-            className="border p-2 rounded" 
+            className={inputClass}
             value={formData.paymentMethod} onChange={e => setFormData({...formData, paymentMethod: e.target.value})}
           >
             <option>Transferencia</option>
@@ -82,15 +84,15 @@ export const ClientManager: React.FC = () => {
           </select>
           <div className="md:col-span-2">
             <textarea 
-              className="border p-2 rounded w-full" placeholder="Dirección completa" 
+              className={inputClass} placeholder="Dirección completa" 
               value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} 
             />
           </div>
         </div>
         <div className="mt-4 flex justify-end space-x-2">
-          {editingId && <button onClick={resetForm} className="px-4 py-2 text-slate-500">Cancelar</button>}
-          <button onClick={handleSave} className="bg-accent text-white px-6 py-2 rounded shadow hover:bg-blue-600">
-            Guardar Cliente
+          {editingId && <button onClick={resetForm} className="px-4 py-2 text-slate-500 hover:text-slate-800 font-medium">Cancelar</button>}
+          <button onClick={handleSave} className="bg-slate-900 text-white px-6 py-2 rounded shadow hover:bg-slate-800 font-bold transition-colors">
+            {editingId ? 'Actualizar Cliente' : 'Guardar Cliente'}
           </button>
         </div>
       </div>
@@ -109,17 +111,17 @@ export const ClientManager: React.FC = () => {
           <tbody className="divide-y divide-gray-100">
             {clients.map(c => (
               <tr key={c.id} className="hover:bg-gray-50">
-                <td className="px-6 py-3 font-medium">
+                <td className="px-6 py-3 font-medium text-slate-800">
                   {c.commercialName}
                   <div className="text-xs text-slate-400 font-normal">{c.legalName}</div>
                 </td>
-                <td className="px-6 py-3">{c.cif}</td>
-                <td className="px-6 py-3">
+                <td className="px-6 py-3 text-slate-600">{c.cif}</td>
+                <td className="px-6 py-3 text-slate-600">
                   {c.email}<br/>{c.phone}
                 </td>
                 <td className="px-6 py-3 text-right space-x-2">
-                  <button onClick={() => handleEdit(c)} className="text-accent hover:underline">Editar</button>
-                  <button onClick={() => handleDelete(c.id)} className="text-red-500 hover:underline">Eliminar</button>
+                  <button onClick={() => handleEdit(c)} className="text-blue-600 font-medium hover:underline">Editar</button>
+                  <button onClick={() => handleDelete(c.id)} className="text-red-500 font-medium hover:underline">Eliminar</button>
                 </td>
               </tr>
             ))}

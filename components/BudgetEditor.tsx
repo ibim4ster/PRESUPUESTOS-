@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { storageService } from '../services/storage';
 import { generateBudgetPdf } from '../services/pdfGenerator';
-import { Budget, Client, LineItem, Product, PdfConfig, SystemType } from '../types';
+import { Budget, Client, LineItem, Product, PdfConfig, SystemType, ProductKit } from '../types';
+import { SearchableSelect } from './SearchableSelect';
 
 interface BudgetEditorProps {
   initialBudget?: Budget | null;
@@ -21,6 +22,7 @@ const PenIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height=
 const EraserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>;
 const XIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 const DownloadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
+const MailIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>;
 
 const SignaturePad = ({ onSave, onClear, initial }: { onSave: (data: string) => void, onClear: () => void, initial?: string }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -140,12 +142,14 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
       bonusAmount: 0,
       taxPercentage: 21,
       clientSignature: '',
-      system: currentSystem
+      system: currentSystem,
+      internalNotes: ''
     };
   });
 
   const [clients, setClients] = useState<Client[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [kits, setKits] = useState<ProductKit[]>([]);
   const [company] = useState(storageService.getCompanyProfile());
   const [pdfConfig] = useState(storageService.getPdfConfig());
   
@@ -156,6 +160,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
   useEffect(() => {
     setClients(storageService.getClients());
     setProducts(storageService.getProducts());
+    setKits(storageService.getProductKits());
   }, []);
 
   useEffect(() => {
@@ -221,6 +226,40 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
     updateBudget({ lineItems: [...budget.lineItems, newItem] });
   };
 
+  const addKitAsLines = (kit: ProductKit) => {
+      // 1. Add section header for kit? Maybe better to just add products. 
+      // User said "add lines automatically". 
+      // Let's add a section title with the kit name first for clarity
+      const section: LineItem = {
+          id: crypto.randomUUID(),
+          type: 'section',
+          reference: '',
+          description: kit.reference.toUpperCase(),
+          units: 0,
+          price: 0
+      };
+
+      const newItems: LineItem[] = [section];
+      
+      kit.items.forEach(item => {
+          const prod = products.find(p => p.id === item.productId);
+          if (prod) {
+              newItems.push({
+                  id: crypto.randomUUID(),
+                  type: 'product',
+                  productId: prod.id,
+                  reference: prod.reference,
+                  description: prod.description,
+                  price: prod.price,
+                  image: prod.image,
+                  units: item.units
+              });
+          }
+      });
+
+      updateBudget({ lineItems: [...budget.lineItems, ...newItems] });
+  };
+
   const updateLineItem = (id: string, updates: Partial<LineItem>) => {
     const newLines = budget.lineItems.map(item => item.id === id ? { ...item, ...updates } : item);
     updateBudget({ lineItems: newLines });
@@ -277,8 +316,35 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
     setPreviewUrl(null);
   };
 
+  const handleSendEmail = () => {
+      if (!budget.clientData.email) return alert('El cliente no tiene email registrado.');
+      const subject = encodeURIComponent(`Presupuesto ${budget.number} - ${company.name}`);
+      const body = encodeURIComponent(`Estimado/a ${budget.clientData.commercialName},\n\nAdjunto le remitimos el presupuesto nº ${budget.number} solicitado.\n\nQuedamos a su disposición para cualquier duda.\n\nAtentamente,\n${company.name}`);
+      window.location.href = `mailto:${budget.clientData.email}?subject=${subject}&body=${body}`;
+  };
+
   // Filter products relevant to current system or marked as both
   const availableProducts = products.filter(p => !p.system || p.system === 'both' || p.system === currentSystem);
+  const availableKits = kits.filter(k => !k.system || k.system === 'both' || k.system === currentSystem);
+
+  const clientOptions = clients.map(c => ({
+    label: c.commercialName,
+    value: c.id,
+    subLabel: c.legalName
+  }));
+
+  const productOptions = availableProducts.map(p => ({
+    label: `${p.reference} - ${p.description.substring(0, 30)}...`,
+    value: p.id,
+    subLabel: `${p.price.toFixed(2)}€`,
+    image: p.image
+  }));
+
+  const kitOptions = availableKits.map(k => ({
+      label: `📦 PACK: ${k.reference}`,
+      value: k.id,
+      subLabel: k.description
+  }));
 
   return (
     <>
@@ -300,7 +366,14 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="flex items-center gap-2 w-full md:w-auto flex-wrap md:flex-nowrap">
+            <button 
+               onClick={handleSendEmail}
+               className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-medium text-sm flex items-center gap-2"
+               title="Enviar Email al Cliente"
+            >
+                <MailIcon /> <span className="hidden md:inline">Email</span>
+            </button>
             <button 
               onClick={handlePreview}
               className="flex-1 md:flex-none justify-center px-4 py-3 md:py-2 text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-sm flex items-center gap-2 font-medium text-sm"
@@ -328,16 +401,14 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
                   <svg className={`w-4 h-4 ${isSage ? 'text-[#00d061]' : 'text-red-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                   Datos del Cliente
                 </h3>
-                <select 
-                  className="w-full sm:w-auto text-sm bg-white border border-gray-300 text-slate-900 rounded-md shadow-sm focus:border-accent focus:ring focus:ring-accent/20" 
-                  value={budget.clientId} 
-                  onChange={e => handleClientSelect(e.target.value)}
-                >
-                  <option value="">-- Cargar Cliente --</option>
-                  {clients.map(c => (
-                    <option key={c.id} value={c.id}>{c.commercialName}</option>
-                  ))}
-                </select>
+                <div className="w-full sm:w-64">
+                   <SearchableSelect 
+                     options={clientOptions}
+                     value={budget.clientId}
+                     onChange={handleClientSelect}
+                     placeholder="Buscar cliente..."
+                   />
+                </div>
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -419,6 +490,15 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
                       </div>
                   </div>
                 </div>
+                <div>
+                   <label className="block text-xs font-bold text-slate-500 mb-1">Notas Internas (Privado)</label>
+                   <textarea 
+                      className="w-full bg-white border border-gray-300 text-slate-900 rounded-md text-xs p-2 h-16 resize-none focus:border-accent focus:ring-accent"
+                      placeholder="Notas solo para la empresa..."
+                      value={budget.internalNotes || ''}
+                      onChange={e => updateBudget({ internalNotes: e.target.value })}
+                   />
+                </div>
               </div>
             </div>
           </section>
@@ -427,26 +507,32 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
           <section className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
             <div className="p-4 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <h3 className="text-lg font-bold text-slate-800">Conceptos y Productos</h3>
-              <div className="flex flex-wrap gap-2 w-full md:w-auto">
+              <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
                 <button onClick={addSectionItem} className="flex-1 md:flex-none text-sm bg-white border border-slate-300 px-3 py-2 rounded-md hover:bg-slate-50 text-slate-700 font-medium shadow-sm">
                   + Sección
                 </button>
-                <button onClick={addLineItem} className="flex-1 md:flex-none text-sm bg-white border border-slate-300 px-3 py-2 rounded-md hover:bg-slate-50 text-slate-700 font-medium shadow-sm">
-                  + Manual
-                </button>
-                <select 
-                  className={`text-sm border bg-opacity-5 font-medium px-3 py-2 rounded-md w-full md:w-48 focus:ring-2 focus:ring-opacity-50 ${isSage ? 'border-[#00d061] text-black bg-[#00d061] focus:ring-green-400' : 'border-red-600 text-red-600 bg-red-600 focus:ring-red-400'}`} 
-                  onChange={e => {
-                      const p = products.find(prod => prod.id === e.target.value);
-                      if(p) {
-                        addProductAsLine(p);
-                        e.target.value = ''; // Reset
-                      }
-                  }}
-                >
-                  <option value="">+ Añadir Producto...</option>
-                  {availableProducts.map(p => <option key={p.id} value={p.id}>{p.reference}</option>)}
-                </select>
+                <div className="w-full md:w-48">
+                    <SearchableSelect 
+                        options={kitOptions}
+                        value=""
+                        onChange={(val) => {
+                             const k = kits.find(kit => kit.id === val);
+                             if(k) addKitAsLines(k);
+                        }}
+                        placeholder="+ Añadir Pack..."
+                    />
+                </div>
+                <div className="w-full md:w-64">
+                    <SearchableSelect 
+                        options={productOptions}
+                        value=""
+                        onChange={(val) => {
+                            const p = products.find(prod => prod.id === val);
+                            if(p) addProductAsLine(p);
+                        }}
+                        placeholder="+ Añadir Producto..."
+                    />
+                </div>
               </div>
             </div>
 

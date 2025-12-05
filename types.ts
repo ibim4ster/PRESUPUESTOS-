@@ -1,5 +1,5 @@
 
-export type SystemType = 'agora' | 'sage';
+export type SystemType = 'agora' | 'sage' | 'sage200' | 'sagedespachos';
 
 export interface Product {
   id: string;
@@ -7,7 +7,20 @@ export interface Product {
   description: string;
   price: number;
   image?: string; // Base64
-  system: 'agora' | 'sage' | 'both'; // New field to filter catalog
+  system: SystemType | 'both'; // 'both' is kept for backward compatibility, though specific assignment is preferred
+}
+
+export interface ProductKitItem {
+  productId: string;
+  units: number;
+}
+
+export interface ProductKit {
+  id: string;
+  reference: string; // Kit Name
+  description: string;
+  items: ProductKitItem[];
+  system: SystemType | 'both';
 }
 
 export interface Client {
@@ -42,7 +55,7 @@ export interface Budget {
   clientData: Client; // Snapshot of client data at time of creation
   validityDays: number;
   
-  system: SystemType; // New field to distinguish budgets
+  system: SystemType; 
 
   lineItems: LineItem[];
   
@@ -52,6 +65,7 @@ export interface Budget {
   taxPercentage: number;
   
   clientSignature?: string; // Base64 image
+  internalNotes?: string; // Notes not visible to client
 }
 
 export interface CompanyProfile {
@@ -70,17 +84,10 @@ export interface CustomLegalText {
   active: boolean;
 }
 
-export interface PdfConfig {
-  // Ágora Theme
+// New Structure: Separate configs per system
+export interface PdfSystemConfig {
   primaryColor: string; 
   secondaryColor: string; 
-
-  // Sage 50 Theme
-  sagePrimaryColor: string;
-  sageSecondaryColor: string;
-
-  headingFont: string;
-  bodyFont: string;
   
   // Toggles
   showLogo: boolean;
@@ -92,18 +99,24 @@ export interface PdfConfig {
   showQr: boolean;
 
   // Custom Texts
-  titleText: string; // "PRESUPUESTO"
+  titleText: string; 
   footerText: string;
   
-  legalTextIds: string[]; // IDs from DEFAULT_LEGAL_TEXTS
-  customLegalTexts: CustomLegalText[]; // New user defined texts
+  legalTextIds: string[]; 
+  customLegalTexts: CustomLegalText[]; 
 
   partnerLogos: {
-    agora?: string;
-    concord?: string;
-    cashloogy?: string;
-    // Logic removed
+    slot1?: string; // Agora: Agora / Sage: Partner 1
+    slot2?: string; // Agora: Concord / Sage: Partner 2
+    slot3?: string; // Agora: Cashlogy / Sage: Partner 3
   };
+}
+
+export interface PdfConfig {
+  agora: PdfSystemConfig;
+  sage: PdfSystemConfig; // Sage 50
+  sage200: PdfSystemConfig;
+  sagedespachos: PdfSystemConfig;
 }
 
 export interface CloudConfig {

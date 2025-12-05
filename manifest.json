@@ -1,6 +1,6 @@
 {
-  "name": "ProQuote Manager",
-  "short_name": "ProQuote",
+  "name": "Gravity Manager",
+  "short_name": "Gravity",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
