@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { storageService } from '../services/storage';
 import { authService } from '../services/auth';
@@ -39,6 +40,15 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         const inputHash = await authService.hashPassword(password);
         if (inputHash === foundUser.passwordHash) {
             authService.setSession(foundUser);
+            
+            // LOG LOGIN
+            storageService.addLog({
+                userId: foundUser.id,
+                userName: foundUser.name,
+                action: 'LOGIN_EXITOSO',
+                details: 'Inicio de sesión'
+            });
+
             onLoginSuccess(foundUser);
         } else {
             setError('Usuario o contraseña incorrectos.');

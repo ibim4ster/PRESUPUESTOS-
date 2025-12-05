@@ -1,4 +1,5 @@
 
+
 export type SystemType = 'agora' | 'sage' | 'sage200' | 'sagedespachos';
 
 export type UserRole = 'admin' | 'commercial';
@@ -10,6 +11,15 @@ export interface User {
   name: string;
   role: UserRole;
   createdAt: string;
+}
+
+export interface LogEntry {
+  id: string;
+  timestamp: string;
+  userId: string;
+  userName: string;
+  action: string; // 'LOGIN', 'CREATE_BUDGET', 'DELETE_CLIENT', etc.
+  details: string;
 }
 
 export interface Product {
@@ -67,6 +77,10 @@ export interface Budget {
   validityDays: number;
   
   system: SystemType; 
+  
+  // Attribution
+  createdBy?: string; // User ID
+  creatorName?: string; // Name Snapshot
 
   lineItems: LineItem[];
   

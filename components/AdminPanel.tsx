@@ -1,8 +1,9 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storage';
 import { authService } from '../services/auth';
-import { User, UserRole } from '../types';
+import { User, UserRole, LogEntry } from '../types';
 
 // Icons
 const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>;
@@ -10,9 +11,13 @@ const KeyIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height=
 const EditIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>;
 const SearchIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
 const UserPlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>;
+const UsersIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+const ActivityIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>;
 
 export const AdminPanel: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'users' | 'logs'>('users');
   const [users, setUsers] = useState<User[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [currentUser] = useState<User | null>(authService.getSession());
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -31,13 +36,14 @@ export const AdminPanel: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
   useEffect(() => {
-    loadUsers();
-    const unsub = storageService.subscribe(loadUsers);
+    loadData();
+    const unsub = storageService.subscribe(loadData);
     return unsub;
   }, []);
 
-  const loadUsers = () => {
+  const loadData = () => {
     setUsers(storageService.getUsers());
+    setLogs(storageService.getLogs());
   };
 
   const getInitials = (name: string) => name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
@@ -63,17 +69,18 @@ export const AdminPanel: React.FC = () => {
     };
 
     storageService.saveUser(newUser);
+    storageService.addLog({ userId: currentUser?.id, userName: currentUser?.name, action: 'USER_CREATED', details: `Created user ${newUser.username}` });
     setFormData({ username: '', name: '', password: '', role: 'commercial' });
     alert('Usuario creado correctamente');
   };
 
   const handleUpdateUser = () => {
       if (!editingUser) return;
-      // Check username uniqueness if changed
       const existing = users.find(u => u.username.toLowerCase() === editingUser.username.toLowerCase() && u.id !== editingUser.id);
       if (existing) return alert('El nombre de usuario ya está en uso por otra persona.');
 
       storageService.saveUser(editingUser);
+      storageService.addLog({ userId: currentUser?.id, userName: currentUser?.name, action: 'USER_UPDATED', details: `Updated user ${editingUser.username}` });
       setEditingUser(null);
       alert('Datos actualizados correctamente.');
   };
@@ -82,6 +89,7 @@ export const AdminPanel: React.FC = () => {
     if (userId === currentUser?.id) return alert('No puedes borrar tu propio usuario.');
     if (confirm('¿Estás seguro de eliminar este usuario? Esta acción no se puede deshacer.')) {
         storageService.deleteUser(userId);
+        storageService.addLog({ userId: currentUser?.id, userName: currentUser?.name, action: 'USER_DELETED', details: `Deleted user ID ${userId}` });
     }
   };
 
@@ -94,6 +102,8 @@ export const AdminPanel: React.FC = () => {
       const updatedUser = { ...user, passwordHash: hash };
       
       storageService.saveUser(updatedUser);
+      storageService.addLog({ userId: currentUser?.id, userName: currentUser?.name, action: 'USER_PASS_RESET', details: `Reset password for ${user.username}` });
+      
       setResetUserId(null);
       setNewPassword('');
       alert('Contraseña actualizada correctamente.');
@@ -117,168 +127,227 @@ export const AdminPanel: React.FC = () => {
          </span>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-          
-          {/* User List */}
-          <div className="xl:col-span-2 space-y-4">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-4">
-                      <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                          Usuarios del Sistema
-                          <span className="text-xs font-bold bg-white px-2 py-0.5 rounded border border-gray-200 text-slate-500">{users.length}</span>
-                      </h3>
-                      <div className="relative w-full sm:w-64">
-                          <input 
-                            type="text" 
-                            placeholder="Buscar usuario..." 
-                            className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                          />
-                          <div className="absolute left-3 top-2.5 text-slate-400">
-                              <SearchIcon />
-                          </div>
-                      </div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="text-xs text-slate-500 uppercase bg-white border-b border-gray-100">
-                            <tr>
-                                <th className="px-6 py-3">Usuario</th>
-                                <th className="px-6 py-3">Rol / Permisos</th>
-                                <th className="px-6 py-3">Alta</th>
-                                <th className="px-6 py-3 text-right">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {filteredUsers.map(user => (
-                                <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-xs border border-white shadow-sm">
-                                                {getInitials(user.name)}
-                                            </div>
-                                            <div>
-                                                <div className="font-bold text-slate-800">{user.name}</div>
-                                                <div className="text-xs text-slate-500">@{user.username}</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        {user.role === 'admin' ? (
-                                            <span className="inline-flex items-center gap-1.5 bg-red-50 text-red-700 px-2.5 py-1 rounded-full text-xs font-bold border border-red-100">
-                                                Administrador
-                                            </span>
-                                        ) : (
-                                            <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full text-xs font-bold border border-blue-100">
-                                                Comercial
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-500 text-xs font-mono">
-                                        {new Date(user.createdAt).toLocaleDateString()}
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex justify-end items-center gap-2">
-                                            <button 
-                                                onClick={() => setEditingUser(user)}
-                                                className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                title="Editar Datos y Permisos"
-                                            >
-                                                <EditIcon />
-                                            </button>
-                                            <button 
-                                                onClick={() => setResetUserId(user.id)}
-                                                className="p-2 text-slate-500 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                                                title="Cambiar Contraseña"
-                                            >
-                                                <KeyIcon />
-                                            </button>
-                                            {user.id !== currentUser?.id && (
-                                                <button 
-                                                    onClick={() => handleDeleteUser(user.id)}
-                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                    title="Eliminar usuario permanentemente"
-                                                >
-                                                    <TrashIcon />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                            {filteredUsers.length === 0 && (
-                                <tr>
-                                    <td colSpan={4} className="px-6 py-10 text-center text-slate-400 italic">
-                                        No se encontraron usuarios
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                  </div>
-              </div>
-          </div>
-
-          {/* Create User Form */}
-          <div className="space-y-4">
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 sticky top-24">
-                  <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 pb-4 border-b border-gray-100">
-                      <UserPlusIcon />
-                      Crear Nuevo Usuario
-                  </h3>
-                  <form onSubmit={handleCreateUser} className="space-y-5">
-                      <div>
-                          <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Nombre Completo</label>
-                          <input 
-                            className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none transition-shadow"
-                            placeholder="Ej: Juan Pérez"
-                            value={formData.name}
-                            onChange={e => setFormData({...formData, name: e.target.value})}
-                          />
-                      </div>
-                      <div>
-                          <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Usuario (Login)</label>
-                          <input 
-                            className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none transition-shadow"
-                            placeholder="Ej: jperez"
-                            value={formData.username}
-                            onChange={e => setFormData({...formData, username: e.target.value})}
-                            autoComplete="off"
-                          />
-                      </div>
-                      <div>
-                          <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Contraseña Inicial</label>
-                          <input 
-                            type="password"
-                            className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none transition-shadow"
-                            placeholder="••••••"
-                            value={formData.password}
-                            onChange={e => setFormData({...formData, password: e.target.value})}
-                            autoComplete="new-password"
-                          />
-                      </div>
-                      <div>
-                          <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Rol / Permisos</label>
-                          <select 
-                             className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none cursor-pointer"
-                             value={formData.role}
-                             onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
-                          >
-                              <option value="commercial">Comercial (Ver sus ventas)</option>
-                              <option value="admin">Administrador (Acceso Total)</option>
-                          </select>
-                      </div>
-                      <button 
-                        type="submit"
-                        className="w-full bg-slate-900 text-white font-bold py-3 rounded-lg hover:bg-slate-800 transition-colors shadow-lg mt-4 flex justify-center items-center gap-2"
-                      >
-                          <UserPlusIcon /> Crear Usuario
-                      </button>
-                  </form>
-              </div>
-          </div>
+      {/* Tabs */}
+      <div className="flex bg-white rounded-lg p-1 border border-gray-200 w-fit">
+          <button 
+             onClick={() => setActiveTab('users')}
+             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'users' ? 'bg-slate-900 text-white shadow' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+              <UsersIcon /> Usuarios
+          </button>
+          <button 
+             onClick={() => setActiveTab('logs')}
+             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'logs' ? 'bg-slate-900 text-white shadow' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+              <ActivityIcon /> Auditoría / Logs
+          </button>
       </div>
+
+      {/* VIEW: USERS */}
+      {activeTab === 'users' && (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            <div className="xl:col-span-2 space-y-4">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                            Usuarios del Sistema
+                            <span className="text-xs font-bold bg-white px-2 py-0.5 rounded border border-gray-200 text-slate-500">{users.length}</span>
+                        </h3>
+                        <div className="relative w-full sm:w-64">
+                            <input 
+                                type="text" 
+                                placeholder="Buscar usuario..." 
+                                className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                            <div className="absolute left-3 top-2.5 text-slate-400">
+                                <SearchIcon />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="text-xs text-slate-500 uppercase bg-white border-b border-gray-100">
+                                <tr>
+                                    <th className="px-6 py-3">Usuario</th>
+                                    <th className="px-6 py-3">Rol / Permisos</th>
+                                    <th className="px-6 py-3">Alta</th>
+                                    <th className="px-6 py-3 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {filteredUsers.map(user => (
+                                    <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-xs border border-white shadow-sm">
+                                                    {getInitials(user.name)}
+                                                </div>
+                                                <div>
+                                                    <div className="font-bold text-slate-800">{user.name}</div>
+                                                    <div className="text-xs text-slate-500">@{user.username}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {user.role === 'admin' ? (
+                                                <span className="inline-flex items-center gap-1.5 bg-red-50 text-red-700 px-2.5 py-1 rounded-full text-xs font-bold border border-red-100">
+                                                    Administrador
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full text-xs font-bold border border-blue-100">
+                                                    Comercial
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-500 text-xs font-mono">
+                                            {new Date(user.createdAt).toLocaleDateString()}
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex justify-end items-center gap-2">
+                                                <button 
+                                                    onClick={() => setEditingUser(user)}
+                                                    className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                    title="Editar Datos y Permisos"
+                                                >
+                                                    <EditIcon />
+                                                </button>
+                                                <button 
+                                                    onClick={() => setResetUserId(user.id)}
+                                                    className="p-2 text-slate-500 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                                                    title="Cambiar Contraseña"
+                                                >
+                                                    <KeyIcon />
+                                                </button>
+                                                {user.id !== currentUser?.id && (
+                                                    <button 
+                                                        onClick={() => handleDeleteUser(user.id)}
+                                                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                        title="Eliminar usuario permanentemente"
+                                                    >
+                                                        <TrashIcon />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {/* Create User Form */}
+            <div className="space-y-4">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 sticky top-24">
+                    <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 pb-4 border-b border-gray-100">
+                        <UserPlusIcon />
+                        Crear Nuevo Usuario
+                    </h3>
+                    <form onSubmit={handleCreateUser} className="space-y-5">
+                        <div>
+                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Nombre Completo</label>
+                            <input 
+                                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none transition-shadow"
+                                placeholder="Ej: Juan Pérez"
+                                value={formData.name}
+                                onChange={e => setFormData({...formData, name: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Usuario (Login)</label>
+                            <input 
+                                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none transition-shadow"
+                                placeholder="Ej: jperez"
+                                value={formData.username}
+                                onChange={e => setFormData({...formData, username: e.target.value})}
+                                autoComplete="off"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Contraseña Inicial</label>
+                            <input 
+                                type="password"
+                                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none transition-shadow"
+                                placeholder="••••••"
+                                value={formData.password}
+                                onChange={e => setFormData({...formData, password: e.target.value})}
+                                autoComplete="new-password"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Rol / Permisos</label>
+                            <select 
+                                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none cursor-pointer"
+                                value={formData.role}
+                                onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
+                            >
+                                <option value="commercial">Comercial (Ver sus ventas)</option>
+                                <option value="admin">Administrador (Acceso Total)</option>
+                            </select>
+                        </div>
+                        <button 
+                            type="submit"
+                            className="w-full bg-slate-900 text-white font-bold py-3 rounded-lg hover:bg-slate-800 transition-colors shadow-lg mt-4 flex justify-center items-center gap-2"
+                        >
+                            <UserPlusIcon /> Crear Usuario
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* VIEW: LOGS */}
+      {activeTab === 'logs' && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-in fade-in duration-300">
+             <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                    Registro de Auditoría
+                </h3>
+             </div>
+             <div className="overflow-x-auto">
+                 <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-slate-500 uppercase bg-white border-b border-gray-100">
+                        <tr>
+                            <th className="px-6 py-3">Fecha / Hora</th>
+                            <th className="px-6 py-3">Usuario</th>
+                            <th className="px-6 py-3">Acción</th>
+                            <th className="px-6 py-3">Detalle</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {logs.map(log => (
+                            <tr key={log.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-3 text-xs font-mono text-slate-500 whitespace-nowrap">
+                                    {new Date(log.timestamp).toLocaleString()}
+                                </td>
+                                <td className="px-6 py-3 font-medium text-slate-800">
+                                    {log.userName}
+                                </td>
+                                <td className="px-6 py-3">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase
+                                        ${log.action.includes('LOGIN') ? 'bg-green-100 text-green-800' : 
+                                          log.action.includes('DELETE') ? 'bg-red-100 text-red-800' :
+                                          log.action.includes('CREATE') ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
+                                        {log.action}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-3 text-slate-600 truncate max-w-md" title={log.details}>
+                                    {log.details}
+                                </td>
+                            </tr>
+                        ))}
+                        {logs.length === 0 && (
+                            <tr><td colSpan={4} className="p-8 text-center text-slate-400 italic">No hay registros de actividad.</td></tr>
+                        )}
+                    </tbody>
+                 </table>
+             </div>
+          </div>
+      )}
 
       {/* Edit User Modal */}
       {editingUser && (

@@ -1,14 +1,16 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { storageService } from '../services/storage';
 import { generateBudgetPdf } from '../services/pdfGenerator';
-import { Budget, Client, LineItem, Product, PdfConfig, SystemType, ProductKit } from '../types';
+import { Budget, Client, LineItem, Product, PdfConfig, SystemType, ProductKit, User } from '../types';
 import { SearchableSelect } from './SearchableSelect';
 
 interface BudgetEditorProps {
   initialBudget?: Budget | null;
   onClose: () => void;
   currentSystem: SystemType;
+  currentUser: User; // Added prop
 }
 
 // Icons
@@ -117,7 +119,7 @@ const SignaturePad = ({ onSave, onClear, initial }: { onSave: (data: string) => 
   );
 };
 
-export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClose, currentSystem }) => {
+export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClose, currentSystem, currentUser }) => {
   const isNew = !initialBudget;
   const isSage = currentSystem === 'sage';
   const saveBtnColor = isSage ? 'bg-[#00d061] text-black hover:bg-[#00b050]' : 'bg-red-600 text-white hover:bg-red-700';
@@ -143,7 +145,10 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
       taxPercentage: 21,
       clientSignature: '',
       system: currentSystem,
-      internalNotes: ''
+      internalNotes: '',
+      // ATTRIBUTION
+      createdBy: currentUser.id,
+      creatorName: currentUser.name
     };
   });
 
@@ -166,12 +171,26 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
   useEffect(() => {
     if(!isSaved) {
       const timer = setTimeout(() => {
-        storageService.saveBudget(budget);
-        setIsSaved(true);
+        saveWithLogs();
       }, 1500);
       return () => clearTimeout(timer);
     }
   }, [budget, isSaved]);
+
+  const saveWithLogs = () => {
+      storageService.saveBudget(budget);
+      
+      // LOG THE ACTION
+      const actionType = isNew ? 'PRESUPUESTO_CREADO' : 'PRESUPUESTO_MODIFICADO';
+      storageService.addLog({
+          userId: currentUser.id,
+          userName: currentUser.name,
+          action: actionType,
+          details: `Presupuesto ${budget.number} (${budget.clientData.commercialName || 'Sin Cliente'})`
+      });
+
+      setIsSaved(true);
+  };
 
   const updateBudget = (updates: Partial<Budget>) => {
     setBudget(prev => ({ ...prev, ...updates, updatedAt: new Date().toISOString() }));
@@ -227,9 +246,6 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
   };
 
   const addKitAsLines = (kit: ProductKit) => {
-      // 1. Add section header for kit? Maybe better to just add products. 
-      // User said "add lines automatically". 
-      // Let's add a section title with the kit name first for clarity
       const section: LineItem = {
           id: crypto.randomUUID(),
           type: 'section',
@@ -288,14 +304,14 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
   const total = taxableBase + taxAmount;
 
   const handleGeneratePDF = () => {
-    storageService.saveBudget(budget);
+    saveWithLogs();
     const doc = generateBudgetPdf(budget, company, pdfConfig);
     const fileName = `Presupuesto_${budget.number}_${budget.clientData.commercialName}.pdf`;
     doc.save(fileName);
   };
 
   const handlePreview = () => {
-    storageService.saveBudget(budget);
+    saveWithLogs();
     try {
       const doc = generateBudgetPdf(budget, company, pdfConfig);
       const blob = doc.output('blob');
@@ -318,6 +334,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
 
   const handleSendEmail = () => {
       if (!budget.clientData.email) return alert('El cliente no tiene email registrado.');
+      saveWithLogs();
       const subject = encodeURIComponent(`Presupuesto ${budget.number} - ${company.name}`);
       const body = encodeURIComponent(`Estimado/a ${budget.clientData.commercialName},\n\nAdjunto le remitimos el presupuesto nº ${budget.number} solicitado.\n\nQuedamos a su disposición para cualquier duda.\n\nAtentamente,\n${company.name}`);
       window.location.href = `mailto:${budget.clientData.email}?subject=${subject}&body=${body}`;
@@ -489,6 +506,12 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
                         <span className="absolute right-2 top-2 text-xs text-slate-400">días</span>
                       </div>
                   </div>
+                </div>
+                <div>
+                   <label className="block text-xs font-bold text-slate-500 mb-1">Comercial</label>
+                   <div className="bg-slate-100 rounded p-2 text-xs font-mono text-slate-600">
+                       {budget.creatorName || currentUser.name}
+                   </div>
                 </div>
                 <div>
                    <label className="block text-xs font-bold text-slate-500 mb-1">Notas Internas (Privado)</label>

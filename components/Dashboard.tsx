@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState } from 'react';
 import { storageService } from '../services/storage';
 import { Budget, SystemType } from '../types';
@@ -17,6 +18,7 @@ const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height
 
 // Helper for Initials
 const getInitials = (name: string) => {
+  if (!name) return '??';
   return name
     .split(' ')
     .map(n => n[0])
@@ -83,6 +85,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
       status: 'draft',
       clientSignature: undefined,
       system: currentSystem,
+      // Reset Creator on Duplicate? Maybe keep original? Let's reset to "System/User" who duplicated it would need current user here, 
+      // but for simplicity it will pick it up when they edit/save it.
     };
     storageService.saveBudget(newBudget);
   };
@@ -174,6 +178,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
                 <th className="px-8 py-4">Fecha</th>
                 <th className="px-8 py-4 text-right">Importe</th>
                 <th className="px-8 py-4 text-center">Estado</th>
+                <th className="px-8 py-4">Comercial</th>
                 <th className="px-8 py-4 text-right">Acciones</th>
               </tr>
             </thead>
@@ -220,6 +225,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
                          budget.status === 'accepted' ? 'Aceptado' : 'Rechazado'}
                       </span>
                     </td>
+                    <td className="px-8 py-4">
+                         <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
+                                {getInitials(budget.creatorName || 'Sistema')}
+                            </div>
+                            <span className="text-xs font-medium text-slate-600 truncate max-w-[100px]">{budget.creatorName || 'Sistema'}</span>
+                         </div>
+                    </td>
                     <td className="px-8 py-4 text-right">
                       <div className="flex items-center justify-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button 
@@ -253,7 +266,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
               })}
               {budgets.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-8 py-16 text-center text-slate-400 flex flex-col items-center gap-3">
+                  <td colSpan={7} className="px-8 py-16 text-center text-slate-400 flex flex-col items-center gap-3">
                     <div className="bg-slate-50 p-4 rounded-full">
                         <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
                     </div>

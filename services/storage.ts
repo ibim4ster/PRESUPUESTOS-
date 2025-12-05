@@ -1,5 +1,6 @@
 
-import { Budget, Client, CompanyProfile, PdfConfig, Product, CloudConfig, SystemType, PdfSystemConfig, ProductKit, User } from '../types';
+
+import { Budget, Client, CompanyProfile, PdfConfig, Product, CloudConfig, SystemType, PdfSystemConfig, ProductKit, User, LogEntry } from '../types';
 import { initializeApp, FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, 
@@ -21,7 +22,8 @@ const KEYS = {
   PDF_CONFIG: 'proquote_pdf_config_v2', 
   CLOUD_CONFIG: 'proquote_cloud_config',
   USERS: 'proquote_users',
-  INIT: 'proquote_initialized_v6' // Incremented version
+  LOGS: 'proquote_logs', // New Key
+  INIT: 'proquote_initialized_v6'
 };
 
 // --- LOGOS PRE-CARGADOS ---
@@ -53,7 +55,7 @@ const DEFAULT_PDF_CONFIG: PdfConfig = {
         ...DEFAULT_SYSTEM_CONFIG,
         primaryColor: '#000000',
         secondaryColor: '#e6ffef',
-        partnerLogos: {} // Empty for sage by default
+        partnerLogos: {} 
     },
     sage200: {
         ...DEFAULT_SYSTEM_CONFIG,
@@ -106,13 +108,11 @@ let unsubscribeFunctions: Function[] = [];
 const initFirebase = async () => {
   let config = loadLocal<CloudConfig>(KEYS.CLOUD_CONFIG, DEFAULT_CLOUD_CONFIG);
   
-  // Ensure hardcoded credentials are used if local is missing or incorrect
   if (!config.apiKey || config.projectId !== "presupuestos-93a99") {
       config = DEFAULT_CLOUD_CONFIG;
       saveLocal(KEYS.CLOUD_CONFIG, config);
   }
   
-  // Clear previous listeners
   unsubscribeFunctions.forEach(unsub => unsub());
   unsubscribeFunctions = [];
   
@@ -152,21 +152,20 @@ const setupListeners = () => {
     startSync('products', KEYS.PRODUCTS);
     startSync('kits', KEYS.KITS);
     startSync('users', KEYS.USERS);
+    startSync('logs', KEYS.LOGS); // Sync logs
     
     // Singletons
     startSyncSingleton('settings', 'company', KEYS.COMPANY);
     
-    // PDF Config: Full sync
+    // PDF Config
     const pdfRef = doc(db, 'settings', 'pdf');
     const pdfUnsub = onSnapshot(pdfRef, (docSnap) => {
         if (docSnap.exists()) {
             const cloudData = docSnap.data() as PdfConfig;
-            // Merge defaults if new fields added (like sage200)
             const merged = { ...DEFAULT_PDF_CONFIG, ...cloudData };
             saveLocal(KEYS.PDF_CONFIG, merged);
             notify();
         } else {
-            // Cloud empty, push local
             const local = loadLocal<PdfConfig>(KEYS.PDF_CONFIG, DEFAULT_PDF_CONFIG);
             setDoc(pdfRef, local).catch(e => console.error("Error pushing pdf config", e));
         }
@@ -207,7 +206,6 @@ const startSyncSingleton = (collectionName: string, docId: string, localKey: str
             saveLocal(localKey, docSnap.data());
             notify();
         } else {
-            // Cloud empty, push local
             const local = loadLocal(localKey, null);
             if(local) {
                 setDoc(docRef, local).catch(e => console.error("Error pushing singleton:", e));
@@ -253,7 +251,6 @@ export const storageService = {
     initFirebase();
 
     if (initVersion !== KEYS.INIT) {
-        // Reset config to new structure on upgrade
         const currentPdf = loadLocal<PdfConfig>(KEYS.PDF_CONFIG, DEFAULT_PDF_CONFIG);
         const mergedPdf = { ...DEFAULT_PDF_CONFIG, ...currentPdf };
         saveLocal(KEYS.PDF_CONFIG, mergedPdf);
@@ -271,7 +268,6 @@ export const storageService = {
     // CHECK USERS - CREATE DEFAULT ADMIN IF NONE EXIST
     const users = loadLocal<User[]>(KEYS.USERS, []);
     if (users.length === 0) {
-        console.log("Seeding default admin...");
         const adminHash = await authService.hashPassword('LSSlss0711');
         const adminUser: User = {
             id: 'admin-001',
@@ -299,6 +295,30 @@ export const storageService = {
           return { success: false, message: `Error: ${e.message}` };
       }
   },
+
+  // --- LOGGING ---
+  addLog: (entry: Partial<LogEntry>) => {
+      const logs = storageService.getLogs();
+      const newEntry: LogEntry = {
+          id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+          userId: entry.userId || 'system',
+          userName: entry.userName || 'Sistema',
+          action: entry.action || 'UNKNOWN',
+          details: entry.details || ''
+      };
+      
+      // Keep only last 200 logs locally to avoid storage bloat
+      if (logs.length > 200) logs.pop();
+      logs.unshift(newEntry);
+      
+      saveLocal(KEYS.LOGS, logs);
+      pushToCloud('logs', newEntry);
+      // No notify needed for logs usually, but let's do it for realtime admin
+      notify();
+  },
+
+  getLogs: () => loadLocal<LogEntry[]>(KEYS.LOGS, []),
 
   // --- ENTITY GETTERS/SETTERS ---
 
@@ -443,7 +463,8 @@ export const storageService = {
       kits: storageService.getProductKits(),
       company: storageService.getCompanyProfile(),
       pdfConfig: storageService.getPdfConfig(),
-      users: storageService.getUsers()
+      users: storageService.getUsers(),
+      logs: storageService.getLogs()
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -463,6 +484,7 @@ export const storageService = {
       if(data.company) saveLocal(KEYS.COMPANY, data.company);
       if(data.pdfConfig) saveLocal(KEYS.PDF_CONFIG, data.pdfConfig);
       if(data.users) saveLocal(KEYS.USERS, data.users);
+      if(data.logs) saveLocal(KEYS.LOGS, data.logs);
       notify();
       return true;
     } catch(e) { return false; }

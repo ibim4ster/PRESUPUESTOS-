@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
@@ -109,6 +110,7 @@ function App() {
           initialBudget={editingBudget} 
           onClose={handleCloseEditor}
           currentSystem={currentSystem}
+          currentUser={user}
         />
       )}
     </Layout>
