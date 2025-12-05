@@ -4,6 +4,10 @@ import { storageService } from '../services/storage';
 import { Product, ProductKit, ProductKitItem, SystemType } from '../types';
 import { SearchableSelect } from './SearchableSelect';
 
+// Icons
+const SearchIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+const ImageIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>;
+
 export const ProductManager: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'products' | 'kits'>('products');
   const [products, setProducts] = useState<Product[]>([]);
@@ -22,6 +26,7 @@ export const ProductManager: React.FC = () => {
   });
 
   const [filter, setFilter] = useState<'all' | SystemType>('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const update = () => {
@@ -69,8 +74,10 @@ export const ProductManager: React.FC = () => {
   };
 
   const filteredProducts = products.filter(p => {
-    if (filter === 'all') return true;
-    return p.system === filter || p.system === 'both' || !p.system;
+    const matchesSystem = filter === 'all' || p.system === filter || p.system === 'both' || !p.system;
+    const matchesSearch = p.reference.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          p.description.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSystem && matchesSearch;
   });
 
   // --- KIT LOGIC ---
@@ -140,8 +147,11 @@ export const ProductManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-primary">Gestor de Catálogo</h2>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h2 className="text-2xl font-bold text-primary">Gestor de Catálogo</h2>
+            <p className="text-sm text-slate-500">Administra productos y packs.</p>
+        </div>
         <div className="flex bg-slate-200 rounded-lg p-1">
              <button 
                 onClick={() => setActiveTab('products')} 
@@ -161,8 +171,21 @@ export const ProductManager: React.FC = () => {
       {/* PRODUCTS TAB */}
       {activeTab === 'products' && (
         <>
-            <div className="flex justify-end mb-4">
-                <div className="flex bg-white rounded-lg border border-gray-200 overflow-hidden text-xs">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
+                 <div className="relative w-full md:w-64">
+                    <input 
+                        type="text" 
+                        placeholder="Buscar producto..." 
+                        className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    <div className="absolute left-3 top-2.5 text-slate-400">
+                        <SearchIcon />
+                    </div>
+                </div>
+
+                <div className="flex bg-white rounded-lg border border-gray-200 overflow-hidden text-xs w-full md:w-auto overflow-x-auto">
                     <button onClick={() => setFilter('all')} className={`px-2 py-1.5 font-bold ${filter === 'all' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Todos</button>
                     <button onClick={() => setFilter('agora')} className={`px-2 py-1.5 font-bold ${filter === 'agora' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Ágora</button>
                     <button onClick={() => setFilter('sage')} className={`px-2 py-1.5 font-bold ${filter === 'sage' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Sage 50</button>
@@ -233,7 +256,12 @@ export const ProductManager: React.FC = () => {
                 {formData.image ? (
                     <img src={formData.image} alt="Preview" className="max-h-40 object-contain mb-4 bg-white p-2 rounded shadow-sm" />
                 ) : (
-                    <div className="text-slate-400 mb-4 text-center text-sm">Sin imagen</div>
+                    <div className="text-slate-300 mb-4 text-center">
+                        <div className="w-20 h-20 bg-slate-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                            <ImageIcon />
+                        </div>
+                        <span className="text-xs">Sin imagen</span>
+                    </div>
                 )}
                 <label className="cursor-pointer bg-white border border-gray-300 text-slate-700 px-4 py-2 rounded text-sm hover:bg-gray-50 hover:text-slate-900 transition-colors shadow-sm">
                     Subir Imagen
@@ -244,26 +272,29 @@ export const ProductManager: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredProducts.map(p => (
-                <div key={p.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex space-x-4 hover:shadow-md transition-shadow relative">
+                <div key={p.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex space-x-4 hover:shadow-md transition-shadow relative group">
                     <span className={`absolute top-2 right-2 text-[10px] uppercase font-bold px-1.5 rounded text-white ${
                         p.system === 'sage' || p.system?.startsWith('sage') ? 'bg-[#00d061]' : p.system === 'agora' ? 'bg-red-500' : 'bg-slate-400'
                     }`}>
                         {p.system === 'both' ? 'TODOS' : p.system}
                     </span>
-                    <div className="w-16 h-16 bg-gray-50 rounded flex-shrink-0 flex items-center justify-center overflow-hidden border border-gray-100">
-                    {p.image ? <img src={p.image} className="w-full h-full object-cover" /> : <span className="text-xl">📦</span>}
+                    <div className="w-16 h-16 bg-slate-50 rounded flex-shrink-0 flex items-center justify-center overflow-hidden border border-slate-100 text-slate-300">
+                    {p.image ? <img src={p.image} className="w-full h-full object-cover" /> : <ImageIcon />}
                     </div>
-                    <div className="flex-1 min-w-0">
-                    <div className="font-bold text-slate-800 truncate pr-6">{p.reference}</div>
-                    <div className="text-sm text-slate-500 truncate" title={p.description}>{p.description}</div>
-                    <div className="font-mono text-slate-800 font-bold mt-1">{p.price.toFixed(2)} €</div>
+                    <div className="flex-1 min-w-0 pt-1">
+                    <div className="font-bold text-slate-800 truncate pr-6 text-sm">{p.reference}</div>
+                    <div className="text-xs text-slate-500 truncate" title={p.description}>{p.description}</div>
+                    <div className="font-mono text-slate-800 font-bold mt-1 text-sm">{p.price.toFixed(2)} €</div>
                     </div>
-                    <div className="flex flex-col space-y-2 justify-center">
+                    <div className="flex flex-col space-y-2 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => handleEdit(p)} className="text-xs bg-slate-100 p-1.5 rounded hover:bg-slate-200 text-slate-600" title="Editar">✏️</button>
                     <button onClick={() => handleDelete(p.id)} className="text-xs bg-red-50 p-1.5 rounded hover:bg-red-100 text-red-600" title="Borrar">🗑️</button>
                     </div>
                 </div>
                 ))}
+                {filteredProducts.length === 0 && (
+                     <div className="col-span-full text-center py-12 text-slate-400 italic">No se encontraron productos</div>
+                )}
             </div>
         </>
       )}
@@ -333,8 +364,8 @@ export const ProductManager: React.FC = () => {
                                 if(!prod) return null;
                                 return (
                                     <div key={idx} className="flex items-center gap-3 bg-white p-2 rounded border border-gray-200">
-                                        <div className="w-8 h-8 rounded bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden">
-                                            {prod.image ? <img src={prod.image} className="w-full h-full object-cover" /> : <span className="text-xs">📦</span>}
+                                        <div className="w-8 h-8 rounded bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden text-slate-300">
+                                            {prod.image ? <img src={prod.image} className="w-full h-full object-cover" /> : <ImageIcon />}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="text-xs font-bold truncate">{prod.reference}</div>

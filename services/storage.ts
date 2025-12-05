@@ -1,5 +1,4 @@
 
-
 import { Budget, Client, CompanyProfile, PdfConfig, Product, CloudConfig, SystemType, PdfSystemConfig, ProductKit, User, LogEntry } from '../types';
 import { initializeApp, FirebaseApp } from 'firebase/app';
 import { 
@@ -22,8 +21,8 @@ const KEYS = {
   PDF_CONFIG: 'proquote_pdf_config_v2', 
   CLOUD_CONFIG: 'proquote_cloud_config',
   USERS: 'proquote_users',
-  LOGS: 'proquote_logs', // New Key
-  INIT: 'proquote_initialized_v6'
+  LOGS: 'proquote_logs',
+  INIT: 'proquote_initialized_v7' // Bumped version to force new data
 };
 
 // --- LOGOS PRE-CARGADOS ---
@@ -152,7 +151,7 @@ const setupListeners = () => {
     startSync('products', KEYS.PRODUCTS);
     startSync('kits', KEYS.KITS);
     startSync('users', KEYS.USERS);
-    startSync('logs', KEYS.LOGS); // Sync logs
+    startSync('logs', KEYS.LOGS); 
     
     // Singletons
     startSyncSingleton('settings', 'company', KEYS.COMPANY);
@@ -255,12 +254,62 @@ export const storageService = {
         const mergedPdf = { ...DEFAULT_PDF_CONFIG, ...currentPdf };
         saveLocal(KEYS.PDF_CONFIG, mergedPdf);
         
-        if (!loadLocal(KEYS.CLIENTS, null)) {
-             const mockClients: Client[] = [
-                { id: '1', commercialName: 'Restaurante El Puerto', legalName: 'Gastronomía del Mar S.L.', cif: 'B12345678', address: 'Av. Marítima 45, Valencia', email: 'info@elpuerto.com', phone: '960123456', paymentMethod: 'Transferencia' }
-            ];
-            saveLocal(KEYS.CLIENTS, mockClients);
-        }
+        // MOCK CLIENTS
+        const mockClients: Client[] = [
+            { id: '1', commercialName: 'Restaurante El Puerto', legalName: 'Gastronomía del Mar S.L.', cif: 'B12345678', address: 'Av. Marítima 45, Valencia', email: 'info@elpuerto.com', phone: '960123456', paymentMethod: 'Transferencia' },
+            { id: '2', commercialName: 'Modas Paquita', legalName: 'Paquita y Hijos C.B.', cif: 'E98765432', address: 'Calle Mayor 12, Madrid', email: 'compras@modaspaquita.es', phone: '912345678', paymentMethod: 'Domiciliación' },
+            { id: '3', commercialName: 'Asesoría Jurídica López', legalName: 'López Asociados S.L.', cif: 'B45678912', address: 'Paseo de la Castellana 200, Madrid', email: 'admin@lopezasociados.com', phone: '915555555', paymentMethod: 'Transferencia' },
+            { id: '4', commercialName: 'Cafetería Central', legalName: 'Desayunos y Meriendas S.L.', cif: 'B11223344', address: 'Plaza España 5, Sevilla', email: 'hola@cafecentral.es', phone: '954111222', paymentMethod: 'Contado' },
+            { id: '5', commercialName: 'Supermercados Eco', legalName: 'BioAlimentos 2024 S.A.', cif: 'A99887766', address: 'Polígono Industrial Norte 56, Bilbao', email: 'compras@ecosuper.com', phone: '944333222', paymentMethod: 'Transferencia' }
+        ];
+        // Merge with existing to avoid overwrite if they exist, but for this version bump we ensure they are there
+        const existingClients = loadLocal<Client[]>(KEYS.CLIENTS, []);
+        if (existingClients.length < 2) saveLocal(KEYS.CLIENTS, mockClients);
+
+        // MOCK PRODUCTS
+        const mockProducts: Product[] = [
+            { id: 'p1', reference: 'IMP-EPS-001', description: 'Impresora Tickets Epson TM-T20III Térmica', price: 185.00, system: 'both', image: '' },
+            { id: 'p2', reference: 'CAJ-AUTO-01', description: 'Cajón Portamonedas Automático 41x41 Negro', price: 45.50, system: 'both', image: '' },
+            { id: 'p3', reference: 'TPV-TAC-15', description: 'Terminal TPV Táctil 15" Capacitivo J1900 4GB/64GB', price: 650.00, system: 'both', image: '' },
+            { id: 'p4', reference: 'SFT-AGR-RES', description: 'Licencia Ágora Restauración Profesional', price: 450.00, system: 'agora', image: '' },
+            { id: 'p5', reference: 'SFT-AGR-RET', description: 'Licencia Ágora Retail Comercio', price: 390.00, system: 'agora', image: '' },
+            { id: 'p6', reference: 'SFT-SGE-50', description: 'Suscripción Anual Sage 50 Essential 1 Usuario', price: 950.00, system: 'sage', image: '' },
+            { id: 'p7', reference: 'SFT-SGE-200', description: 'Suscripción Anual Sage 200 Advanced', price: 2100.00, system: 'sage200', image: '' },
+            { id: 'p8', reference: 'LEC-HON-1D', description: 'Lector Códigos Barras Honeywell Voyager 1200g', price: 120.00, system: 'both', image: '' },
+            { id: 'p9', reference: 'IMP-ETI-ZEB', description: 'Impresora Etiquetas Zebra ZD220', price: 280.00, system: 'both', image: '' },
+            { id: 'p10', reference: 'SOP-TEC-1H', description: 'Bolsa de Horas Soporte Técnico (10h)', price: 550.00, system: 'both', image: '' }
+        ];
+        const existingProducts = loadLocal<Product[]>(KEYS.PRODUCTS, []);
+        if (existingProducts.length < 2) saveLocal(KEYS.PRODUCTS, mockProducts);
+
+        // MOCK KITS
+        const mockKits: ProductKit[] = [
+            {
+                id: 'k1',
+                reference: 'PACK-TPV-REST',
+                description: 'Pack TPV Completo para Hostelería (Ágora)',
+                system: 'agora',
+                items: [
+                    { productId: 'p3', units: 1 }, // TPV
+                    { productId: 'p1', units: 2 }, // 2 Impresoras (Barra y Cocina)
+                    { productId: 'p2', units: 1 }, // Cajon
+                    { productId: 'p4', units: 1 }, // Licencia
+                ]
+            },
+            {
+                id: 'k2',
+                reference: 'PACK-COMERCIO-ECO',
+                description: 'Pack Básico Comercio Retail',
+                system: 'both',
+                items: [
+                    { productId: 'p3', units: 1 }, // TPV
+                    { productId: 'p1', units: 1 }, // Impresora
+                    { productId: 'p8', units: 1 }, // Lector
+                ]
+            }
+        ];
+        const existingKits = loadLocal<ProductKit[]>(KEYS.KITS, []);
+        if (existingKits.length === 0) saveLocal(KEYS.KITS, mockKits);
 
         localStorage.setItem(KEYS.INIT, KEYS.INIT);
     }
