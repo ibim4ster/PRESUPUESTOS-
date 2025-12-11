@@ -16,7 +16,7 @@ export const ProductManager: React.FC = () => {
   // Product Form State
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Product>({
-    id: '', reference: '', description: '', price: 0, image: '', system: 'both'
+    id: '', reference: '', description: '', price: 0, costPrice: 0, category: '', image: '', system: 'both'
   });
   
   // Kit Form State
@@ -26,6 +26,7 @@ export const ProductManager: React.FC = () => {
   });
 
   const [filter, setFilter] = useState<'all' | SystemType>('all');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
@@ -37,6 +38,9 @@ export const ProductManager: React.FC = () => {
     const unsub = storageService.subscribe(update);
     return unsub;
   }, []);
+
+  // Extract unique categories for filter
+  const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
 
   // --- PRODUCT LOGIC ---
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,21 +68,28 @@ export const ProductManager: React.FC = () => {
   };
 
   const handleEdit = (p: Product) => {
-    setFormData(p);
+    setFormData({ ...p, costPrice: p.costPrice || 0, category: p.category || '' });
     setEditingId(p.id);
   };
 
   const resetForm = () => {
     setEditingId(null);
-    setFormData({ id: '', reference: '', description: '', price: 0, image: '', system: 'both' });
+    setFormData({ id: '', reference: '', description: '', price: 0, costPrice: 0, category: '', image: '', system: 'both' });
   };
 
   const filteredProducts = products.filter(p => {
     const matchesSystem = filter === 'all' || p.system === filter || p.system === 'both' || !p.system;
     const matchesSearch = p.reference.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           p.description.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSystem && matchesSearch;
+    const matchesCategory = categoryFilter === '' || p.category === categoryFilter;
+    
+    return matchesSystem && matchesSearch && matchesCategory;
   });
+
+  // Calculate Margin
+  const marginPercent = formData.price > 0 && formData.costPrice !== undefined
+    ? ((formData.price - formData.costPrice) / formData.price) * 100 
+    : 0;
 
   // --- KIT LOGIC ---
   const handleSaveKit = () => {
@@ -185,12 +196,21 @@ export const ProductManager: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex bg-white rounded-lg border border-gray-200 overflow-hidden text-xs w-full md:w-auto overflow-x-auto">
-                    <button onClick={() => setFilter('all')} className={`px-2 py-1.5 font-bold ${filter === 'all' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Todos</button>
-                    <button onClick={() => setFilter('agora')} className={`px-2 py-1.5 font-bold ${filter === 'agora' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Ágora</button>
-                    <button onClick={() => setFilter('sage')} className={`px-2 py-1.5 font-bold ${filter === 'sage' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Sage 50</button>
-                    <button onClick={() => setFilter('sage200')} className={`px-2 py-1.5 font-bold ${filter === 'sage200' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Sage 200</button>
-                    <button onClick={() => setFilter('sagedespachos')} className={`px-2 py-1.5 font-bold ${filter === 'sagedespachos' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Sage Desp.</button>
+                <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+                    <select 
+                        className="bg-white border border-gray-300 rounded-lg text-xs font-bold text-slate-700 p-2 cursor-pointer focus:outline-none"
+                        value={categoryFilter}
+                        onChange={e => setCategoryFilter(e.target.value)}
+                    >
+                        <option value="">Todas las Categorías</option>
+                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+
+                    <div className="flex bg-white rounded-lg border border-gray-200 overflow-hidden text-xs flex-shrink-0">
+                        <button onClick={() => setFilter('all')} className={`px-2 py-1.5 font-bold ${filter === 'all' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Todos</button>
+                        <button onClick={() => setFilter('agora')} className={`px-2 py-1.5 font-bold ${filter === 'agora' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Ágora</button>
+                        <button onClick={() => setFilter('sage')} className={`px-2 py-1.5 font-bold ${filter === 'sage' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Sage</button>
+                    </div>
                 </div>
             </div>
 
@@ -207,17 +227,53 @@ export const ProductManager: React.FC = () => {
                         onChange={e => setFormData({...formData, reference: e.target.value})} 
                     />
                     </div>
-                    <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Precio (€)</label>
-                    <input 
-                        className="w-full border border-gray-300 p-2 rounded bg-white text-slate-900 focus:ring-2 focus:ring-accent focus:border-transparent outline-none" 
-                        placeholder="0.00" 
-                        type="number" 
-                        step="0.01"
-                        value={formData.price} 
-                        onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})} 
-                    />
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">P. Venta (€)</label>
+                            <input 
+                                className="w-full border border-gray-300 p-2 rounded bg-white text-slate-900 focus:ring-2 focus:ring-accent focus:border-transparent outline-none" 
+                                placeholder="0.00" 
+                                type="number" 
+                                step="0.01"
+                                value={formData.price} 
+                                onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})} 
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">P. Coste (€)</label>
+                            <input 
+                                className="w-full border border-gray-300 p-2 rounded bg-white text-slate-900 focus:ring-2 focus:ring-accent focus:border-transparent outline-none" 
+                                placeholder="0.00" 
+                                type="number" 
+                                step="0.01"
+                                value={formData.costPrice || ''} 
+                                onChange={e => setFormData({...formData, costPrice: parseFloat(e.target.value)})} 
+                            />
+                        </div>
                     </div>
+                    
+                    {/* Margin Indicator */}
+                    <div className="col-span-2 flex justify-between items-center">
+                        <div className="flex items-center gap-2 text-xs">
+                            <span className="font-bold text-slate-500">Margen:</span>
+                            <span className={`font-bold px-2 py-0.5 rounded ${marginPercent > 30 ? 'bg-green-100 text-green-700' : marginPercent > 0 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
+                                {isNaN(marginPercent) ? '0.00' : marginPercent.toFixed(2)}%
+                            </span>
+                        </div>
+                        <div className="w-1/2">
+                             <input 
+                                className="w-full border border-gray-300 p-1.5 rounded text-xs bg-white text-slate-900" 
+                                placeholder="Categoría (ej: Hardware)" 
+                                value={formData.category || ''} 
+                                onChange={e => setFormData({...formData, category: e.target.value})} 
+                                list="category-suggestions"
+                            />
+                            <datalist id="category-suggestions">
+                                {categories.map(c => <option key={c} value={c} />)}
+                            </datalist>
+                        </div>
+                    </div>
+
                     <div className="col-span-2">
                         <label className="block text-xs font-bold text-slate-500 mb-1">Sistema Asignado</label>
                         <div className="flex flex-wrap gap-3">
@@ -284,7 +340,10 @@ export const ProductManager: React.FC = () => {
                     <div className="flex-1 min-w-0 pt-1">
                     <div className="font-bold text-slate-800 truncate pr-6 text-sm">{p.reference}</div>
                     <div className="text-xs text-slate-500 truncate" title={p.description}>{p.description}</div>
-                    <div className="font-mono text-slate-800 font-bold mt-1 text-sm">{p.price.toFixed(2)} €</div>
+                    <div className="flex items-center gap-2 mt-1">
+                        <div className="font-mono text-slate-800 font-bold text-sm">{p.price.toFixed(2)} €</div>
+                        {p.category && <span className="text-[9px] bg-slate-100 text-slate-500 px-1 rounded border border-slate-200">{p.category}</span>}
+                    </div>
                     </div>
                     <div className="flex flex-col space-y-2 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => handleEdit(p)} className="text-xs bg-slate-100 p-1.5 rounded hover:bg-slate-200 text-slate-600" title="Editar">✏️</button>

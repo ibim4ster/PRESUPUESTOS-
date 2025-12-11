@@ -1,7 +1,9 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { storageService } from '../services/storage';
-import { Budget, SystemType } from '../types';
+import { Budget, SystemType, Task, User, LogEntry } from '../types';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+import { authService } from '../services/auth';
 
 interface DashboardProps {
   onEditBudget: (budget: Budget) => void;
@@ -15,76 +17,114 @@ const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" heigh
 const EditIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>;
 const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>;
 const SearchIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
-const FilterIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>;
-const ArrowUpIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>;
-const ArrowDownIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
 const SortIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>;
+const LayoutListIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/><path d="M14 4h7"/><path d="M14 9h7"/><path d="M14 15h7"/><path d="M14 20h7"/></svg>;
+const LayoutKanbanIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>;
+const DownloadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
+const CheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
+const TrophyIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>;
+const ActivityIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>;
 
 // Helper for Initials
 const getInitials = (name: string) => {
   if (!name) return '??';
-  return name
-    .split(' ')
-    .map(n => n[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+  return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
 };
 
 const calculateTotal = (budget: Budget) => {
     return budget.lineItems
       .filter(i => i.type !== 'section')
-      .reduce((s, i) => s + (i.units * i.price), 0);
+      .reduce((s, i) => {
+          const discount = i.discount || 0;
+          const priceAfterDiscount = i.price * (1 - discount / 100);
+          return s + (i.units * priceAfterDiscount);
+      }, 0);
 };
 
 export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget, currentSystem }) => {
   const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [stats, setStats] = useState({ totalMonth: 0, pending: 0, accepted: 0 });
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [stats, setStats] = useState({ totalMonth: 0, pending: 0, accepted: 0, recurring: 0 });
+  const [chartData, setChartData] = useState<any[]>([]);
   
-  // Advanced Filter & Sort State
-  const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
-  
   const [filters, setFilters] = useState({
-      global: '',
-      number: '',
-      client: '',
-      dateStart: '',
-      dateEnd: '',
-      minAmount: '',
-      maxAmount: '',
-      status: 'all',
-      commercial: ''
+      global: '', number: '', client: '', dateStart: '', dateEnd: '', minAmount: '', maxAmount: '', status: 'all', commercial: ''
   });
+
+  const [newTaskTitle, setNewTaskTitle] = useState('');
 
   const isSage = currentSystem === 'sage';
   const buttonColor = isSage ? 'bg-black hover:bg-gray-800' : 'bg-red-600 hover:bg-red-700';
+  const chartColor = isSage ? '#00d061' : '#dc2626';
+  const currentUser = authService.getSession();
 
   useEffect(() => {
     loadData();
-    const unsubscribe = storageService.subscribe(() => {
-        loadData();
-    });
-    return unsubscribe;
-  }, [currentSystem]); 
+    return storageService.subscribe(loadData);
+  }, [currentSystem, currentUser]); 
 
   const loadData = () => {
     const allBudgets = storageService.getBudgets().filter(b => (b.system || 'agora') === currentSystem);
     setBudgets([...allBudgets]); 
+    setLogs(storageService.getLogs().slice(0, 10)); // Get last 10 logs
+    
+    if (currentUser) {
+        const myTasks = storageService.getTasks().filter(t => !t.completed && t.assignedTo === currentUser.id);
+        setTasks(myTasks);
+    }
 
     const now = new Date();
     const currentMonth = now.getMonth();
-    
     const monthlyTotal = allBudgets
       .filter(b => new Date(b.createdAt).getMonth() === currentMonth)
       .reduce((acc, b) => acc + calculateTotal(b), 0);
+
+    const recurringTotal = allBudgets
+      .filter(b => b.status === 'accepted')
+      .reduce((acc, b) => {
+          const recLines = b.lineItems.filter(l => l.isRecurring);
+          const recAmount = recLines.reduce((s, i) => s + (i.price * i.units), 0);
+          return acc + recAmount;
+      }, 0);
 
     setStats({
       totalMonth: monthlyTotal,
       pending: allBudgets.filter(b => b.status === 'pending').length,
       accepted: allBudgets.filter(b => b.status === 'accepted').length,
+      recurring: recurringTotal
     });
+
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const monthKey = d.toLocaleString('es-ES', { month: 'short' });
+        const total = allBudgets.filter(b => {
+            const bDate = new Date(b.createdAt);
+            return bDate.getMonth() === d.getMonth() && bDate.getFullYear() === d.getFullYear();
+        }).reduce((acc, b) => acc + calculateTotal(b), 0);
+        months.push({ name: monthKey, total: total });
+    }
+    setChartData(months);
   }
+
+  const monthlyGoal = currentUser?.monthlyGoal || 0;
+  const progressPercent = monthlyGoal > 0 ? Math.min(100, (stats.totalMonth / monthlyGoal) * 100) : 0;
+
+  const handleAddTask = (e: React.FormEvent) => {
+      e.preventDefault();
+      if(!newTaskTitle.trim() || !currentUser) return;
+      const t: Task = { id: crypto.randomUUID(), title: newTaskTitle, dueDate: new Date().toISOString(), completed: false, priority: 'normal', assignedTo: currentUser.id };
+      storageService.saveTask(t);
+      setNewTaskTitle('');
+  };
+
+  const toggleTask = (task: Task) => {
+      storageService.saveTask({ ...task, completed: !task.completed });
+  };
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -98,14 +138,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
     e.stopPropagation();
     e.preventDefault();
     const newBudget: Budget = {
-      ...budget,
-      id: crypto.randomUUID(),
-      number: storageService.getNextBudgetNumber(currentSystem),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      status: 'draft',
-      clientSignature: undefined,
-      system: currentSystem,
+      ...budget, id: crypto.randomUUID(), number: storageService.getNextBudgetNumber(currentSystem),
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), status: 'draft', clientSignature: undefined, system: currentSystem,
+      events: [{ id: crypto.randomUUID(), timestamp: new Date().toISOString(), authorName: 'Sistema', text: `Duplicado de ${budget.number}`, type: 'creation' }]
     };
     storageService.saveBudget(newBudget);
   };
@@ -116,400 +151,273 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
     onEditBudget(budget);
   };
 
-  // --- SORTING LOGIC ---
+  const handleExportCSV = () => {
+      const headers = ["Numero", "Fecha", "Cliente", "Total", "Estado", "Sistema", "Comercial"];
+      const rows = processedBudgets.map(b => [b.number, new Date(b.createdAt).toLocaleDateString(), `"${b.clientData.commercialName}"`, calculateTotal(b).toFixed(2), b.status, b.system, b.creatorName || ''].join(","));
+      const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
+      const link = document.createElement("a");
+      link.setAttribute("href", encodeURI(csvContent));
+      link.setAttribute("download", `presupuestos_${currentSystem}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  };
+
   const handleSort = (key: string) => {
       let direction: 'asc' | 'desc' = 'asc';
-      if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-          direction = 'desc';
-      }
+      if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
       setSortConfig({ key, direction });
   };
 
-  // --- FILTERING & PROCESSING LOGIC ---
   const processedBudgets = useMemo(() => {
       let result = [...budgets];
-
-      // 1. Filter
       result = result.filter(b => {
-          // Global Search
-          if (filters.global) {
-             const term = filters.global.toLowerCase();
-             const matchesGlobal = 
-                b.number.toLowerCase().includes(term) ||
-                b.clientData.commercialName.toLowerCase().includes(term) ||
-                b.clientData.cif.toLowerCase().includes(term);
-             if (!matchesGlobal) return false;
-          }
-
-          // Column Filters
+          if (filters.global && !JSON.stringify(b).toLowerCase().includes(filters.global.toLowerCase())) return false;
           if (filters.number && !b.number.toLowerCase().includes(filters.number.toLowerCase())) return false;
           if (filters.client && !b.clientData.commercialName.toLowerCase().includes(filters.client.toLowerCase())) return false;
+          if (viewMode === 'list' && filters.status !== 'all' && b.status !== filters.status) return false;
           if (filters.commercial && !(b.creatorName || '').toLowerCase().includes(filters.commercial.toLowerCase())) return false;
-          if (filters.status !== 'all' && b.status !== filters.status) return false;
-
-          // Date Range
-          const bDate = new Date(b.createdAt).getTime();
-          if (filters.dateStart && bDate < new Date(filters.dateStart).getTime()) return false;
-          // End date set to end of day
-          if (filters.dateEnd) {
-              const endDate = new Date(filters.dateEnd);
-              endDate.setHours(23, 59, 59, 999);
-              if (bDate > endDate.getTime()) return false;
-          }
-
-          // Amount Range
-          const total = calculateTotal(b);
-          if (filters.minAmount && total < parseFloat(filters.minAmount)) return false;
-          if (filters.maxAmount && total > parseFloat(filters.maxAmount)) return false;
-
           return true;
       });
-
-      // 2. Sort
       if (sortConfig) {
           result.sort((a, b) => {
-              let valA: any = '';
-              let valB: any = '';
-
-              switch (sortConfig.key) {
-                  case 'number': valA = a.number; valB = b.number; break;
-                  case 'client': valA = a.clientData.commercialName; valB = b.clientData.commercialName; break;
-                  case 'date': valA = new Date(a.createdAt).getTime(); valB = new Date(b.createdAt).getTime(); break;
-                  case 'amount': valA = calculateTotal(a); valB = calculateTotal(b); break;
-                  case 'status': valA = a.status; valB = b.status; break;
-                  case 'commercial': valA = a.creatorName || ''; valB = b.creatorName || ''; break;
-              }
-
-              if (typeof valA === 'string') {
-                  valA = valA.toLowerCase();
-                  valB = valB.toLowerCase();
-              }
-
+              let valA: any = a[sortConfig.key as keyof Budget] || '';
+              let valB: any = b[sortConfig.key as keyof Budget] || '';
+              if (sortConfig.key === 'amount') { valA = calculateTotal(a); valB = calculateTotal(b); }
+              if (sortConfig.key === 'client') { valA = a.clientData.commercialName; valB = b.clientData.commercialName; }
               if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
               if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
               return 0;
           });
       } else {
-          // Default Sort: Newest First
           result.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       }
-
       return result;
-  }, [budgets, filters, sortConfig]);
+  }, [budgets, filters, sortConfig, viewMode]);
 
-
-  // Helper for Sort Header
   const SortableHeader = ({ label, sortKey, width }: { label: string, sortKey: string, width?: string }) => (
-      <th 
-        className={`px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors select-none ${width || ''}`}
-        onClick={() => handleSort(sortKey)}
-      >
-          <div className="flex items-center gap-2">
-              {label}
-              <span className="text-slate-400">
-                  {sortConfig?.key === sortKey ? (
-                      sortConfig.direction === 'asc' ? <ArrowUpIcon /> : <ArrowDownIcon />
-                  ) : <SortIcon />}
-              </span>
-          </div>
+      <th className={`px-6 py-4 cursor-pointer hover:bg-slate-100 ${width}`} onClick={() => handleSort(sortKey)}>
+          <div className="flex items-center gap-2">{label} <span className="text-slate-400"><SortIcon /></span></div>
       </th>
+  );
+
+  const KanbanColumn = ({ status, title, colorClass, items }: { status: string, title: string, colorClass: string, items: Budget[] }) => (
+      <div className="flex flex-col h-full bg-slate-50/50 rounded-xl border border-gray-200 min-w-[300px] w-full md:w-1/4">
+          <div className={`p-3 border-b border-gray-100 rounded-t-xl ${colorClass} bg-opacity-10`}>
+              <div className="flex justify-between items-center mb-1"><h4 className="font-bold text-sm uppercase">{title}</h4><span className="text-xs font-bold bg-white px-2 py-0.5 rounded shadow-sm">{items.length}</span></div>
+              <div className="text-xs font-mono font-bold opacity-70">{items.reduce((acc, b) => acc + calculateTotal(b), 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
+          </div>
+          <div className="p-3 space-y-3 overflow-y-auto max-h-[600px] custom-scrollbar">
+              {items.map(b => (
+                  <div key={b.id} onClick={(e) => handleEditClick(e, b)} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-md cursor-pointer group relative">
+                      <div className="flex justify-between items-start mb-2"><span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-800">{b.number}</span><span className="text-[10px] text-slate-400">{new Date(b.createdAt).toLocaleDateString()}</span></div>
+                      <div className="font-bold text-slate-800 text-sm mb-1 truncate">{b.clientData.commercialName}</div>
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-50">
+                          <span className="font-bold text-slate-900 font-mono text-sm">{calculateTotal(b).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span>
+                          {b.creatorName && (
+                              <div className="flex items-center gap-1" title={b.creatorName}>
+                                  <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[8px] font-bold text-slate-600">
+                                      {getInitials(b.creatorName)}
+                                  </div>
+                              </div>
+                          )}
+                      </div>
+                  </div>
+              ))}
+          </div>
+      </div>
   );
 
   return (
     <div className="space-y-8 pb-20">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-           <div className="text-sm text-slate-500 font-medium mb-1">
-             {new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-           </div>
-           <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Buenos días</h2>
-           <p className="text-slate-500">
-             Resumen de actividad en <strong className="uppercase">{currentSystem}</strong>.
-           </p>
+           <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Buenos días, {currentUser?.name}</h2>
+           <p className="text-slate-500">Resumen de actividad en <strong className="uppercase">{currentSystem}</strong>.</p>
         </div>
-        <button 
-          onClick={onNewBudget}
-          className={`w-full md:w-auto ${buttonColor} text-white px-6 py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 font-bold text-sm transform hover:-translate-y-1`}
-        >
-          <div className="bg-white/20 p-1 rounded-full"><PlusIcon /></div>
-          CREAR PRESUPUESTO
+        <button onClick={onNewBudget} className={`w-full md:w-auto ${buttonColor} text-white px-6 py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 font-bold text-sm transform hover:-translate-y-1`}>
+          <div className="bg-white/20 p-1 rounded-full"><PlusIcon /></div> CREAR PRESUPUESTO
         </button>
       </header>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Card 1: Total */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between h-40 relative overflow-hidden group">
-          <div className={`absolute top-0 left-0 w-full h-1 ${isSage ? 'bg-[#00d061]' : 'bg-blue-600'}`}></div>
-          <div className="flex justify-between items-start">
-             <div className={`p-3 rounded-xl ${isSage ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}>
-               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-             </div>
-             <span className={`text-xs font-bold px-2 py-1 rounded-full ${isSage ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-700'}`}>ESTE MES</span>
+      {/* GAMIFICATION & STATS */}
+      {monthlyGoal > 0 && (
+          <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-6 rounded-2xl shadow-lg text-white flex flex-col md:flex-row items-center gap-6 relative overflow-hidden">
+              <div className="absolute right-0 top-0 h-full w-1/3 bg-white/5 skew-x-12"></div>
+              <div className="flex items-center gap-4 z-10">
+                  <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
+                      <TrophyIcon />
+                  </div>
+                  <div>
+                      <h3 className="font-bold text-lg">Objetivo Mensual</h3>
+                      <p className="text-white/60 text-xs">Mantén el ritmo para alcanzar tu meta.</p>
+                  </div>
+              </div>
+              <div className="flex-1 w-full z-10">
+                  <div className="flex justify-between text-xs font-bold mb-2 uppercase tracking-wide">
+                      <span>Progreso Actual</span>
+                      <span>{progressPercent.toFixed(0)}%</span>
+                  </div>
+                  <div className="w-full bg-slate-700/50 rounded-full h-3 overflow-hidden">
+                      <div className="h-full bg-green-400 transition-all duration-1000 ease-out rounded-full" style={{ width: `${progressPercent}%` }}></div>
+                  </div>
+                  <div className="flex justify-between mt-2 text-xs text-white/50 font-mono">
+                      <span>{stats.totalMonth.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span>
+                      <span>Meta: {monthlyGoal.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span>
+                  </div>
+              </div>
           </div>
-          <div>
-            <div className="text-slate-500 text-sm font-medium mb-1">Volumen Presupuestado</div>
-            <div className="text-3xl font-bold text-slate-900">{stats.totalMonth.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
-          </div>
-        </div>
+      )}
 
-        {/* Card 2: Pending */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between h-40 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-orange-400"></div>
-          <div className="flex justify-between items-start">
-             <div className="p-3 bg-orange-50 text-orange-500 rounded-xl">
-               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-             </div>
-          </div>
-          <div>
-            <div className="text-slate-500 text-sm font-medium mb-1">Pendientes de Aprobación</div>
-            <div className="text-3xl font-bold text-slate-900">{stats.pending} <span className="text-lg text-slate-400 font-normal">docs</span></div>
-          </div>
-        </div>
-
-        {/* Card 3: Accepted */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between h-40 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-green-500"></div>
-          <div className="flex justify-between items-start">
-             <div className="p-3 bg-green-50 text-green-500 rounded-xl">
-               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-             </div>
-          </div>
-          <div>
-            <div className="text-slate-500 text-sm font-medium mb-1">Presupuestos Aceptados</div>
-            <div className="text-3xl font-bold text-slate-900">{stats.accepted} <span className="text-lg text-slate-400 font-normal">docs</span></div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Budgets List */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
-          <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-              Actividad Reciente
-              <span className="bg-gray-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{processedBudgets.length}</span>
-          </h3>
-
-          <div className="flex gap-2 w-full md:w-auto items-center">
-              <div className="relative flex-1 md:w-64">
-                <input 
-                    type="text" 
-                    placeholder="Búsqueda rápida..." 
-                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-gray-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none transition-shadow"
-                    value={filters.global}
-                    onChange={(e) => setFilters({...filters, global: e.target.value})}
-                />
-                <div className="absolute left-3 top-2.5 text-slate-400">
-                    <SearchIcon />
+      {/* MAIN GRID */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          
+          {/* LEFT: Stats & Chart */}
+          <div className="xl:col-span-2 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
+                  <div className={`absolute top-0 left-0 w-full h-1 ${isSage ? 'bg-[#00d061]' : 'bg-blue-600'}`}></div>
+                  <div className="text-slate-500 text-sm font-medium mb-1">Volumen Mes</div>
+                  <div className="text-3xl font-bold text-slate-900">{stats.totalMonth.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-purple-500"></div>
+                  <div className="text-slate-500 text-sm font-medium mb-1">ARR (Recurrente)</div>
+                  <div className="text-3xl font-bold text-purple-700">{stats.recurring.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
+                  <span className="text-xs text-slate-400">Anual Estimado</span>
+                </div>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-orange-400"></div>
+                  <div className="text-slate-500 text-sm font-medium mb-1">Pendientes</div>
+                  <div className="text-3xl font-bold text-slate-900">{stats.pending} <span className="text-lg text-slate-400 font-normal">docs</span></div>
                 </div>
               </div>
+
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-72">
+                <h3 className="text-sm font-bold text-slate-600 uppercase mb-4">Evolución de Ventas</h3>
+                <div className="flex-1">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                            <XAxis dataKey="name" tick={{fontSize: 12, fill: '#94a3b8'}} axisLine={false} tickLine={false} />
+                            <YAxis tick={{fontSize: 12, fill: '#94a3b8'}} axisLine={false} tickLine={false} tickFormatter={(v) => `${v/1000}k`} />
+                            <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                            <Bar dataKey="total" fill={chartColor} radius={[4, 4, 0, 0]} barSize={40} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+              </div>
+          </div>
+
+          {/* RIGHT: Tasks & Activity */}
+          <div className="xl:col-span-1 space-y-6">
               
-              <button 
-                onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold border transition-colors ${showFilters ? 'bg-slate-100 border-slate-300 text-slate-900' : 'bg-white border-gray-200 text-slate-500 hover:text-slate-900 hover:border-slate-300'}`}
-                title="Filtros Avanzados por Columna"
-              >
-                  <FilterIcon /> 
-                  <span className="hidden sm:inline">Filtros</span>
-              </button>
+              {/* TASKS */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden max-h-[350px]">
+                  <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                      <h3 className="font-bold text-slate-800">Mis Tareas</h3>
+                      <span className="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-1 rounded-full">{tasks.length}</span>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+                      {tasks.map(task => (
+                          <div key={task.id} className="flex items-start gap-3 p-3 bg-white border border-gray-100 rounded-xl hover:shadow-md transition-shadow group">
+                              <button onClick={() => toggleTask(task)} className="mt-1 w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-green-500 hover:bg-green-50 text-transparent hover:text-green-600 transition-all flex-shrink-0"><CheckIcon /></button>
+                              <div className="flex-1">
+                                  <p className={`text-sm text-slate-800 font-medium ${task.completed ? 'line-through text-slate-400' : ''}`}>{task.title}</p>
+                                  {task.relatedBudgetNumber && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded mt-1 inline-block">{task.relatedBudgetNumber}</span>}
+                                  <div className="text-[10px] text-slate-400 mt-1">{new Date(task.dueDate).toLocaleDateString()}</div>
+                              </div>
+                          </div>
+                      ))}
+                      {tasks.length === 0 && <div className="text-center py-8 text-slate-400 italic text-sm">¡Todo al día!</div>}
+                  </div>
+                  <div className="p-4 border-t border-gray-100 bg-gray-50">
+                      <form onSubmit={handleAddTask} className="flex gap-2">
+                          <input className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-800 outline-none bg-white text-slate-900" placeholder="Nueva tarea..." value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} />
+                          <button type="submit" className="bg-slate-800 text-white p-2 rounded-lg hover:bg-slate-700"><PlusIcon /></button>
+                      </form>
+                  </div>
+              </div>
+
+              {/* RECENT ACTIVITY */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden max-h-[350px]">
+                  <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+                      <ActivityIcon />
+                      <h3 className="font-bold text-slate-800">Última Actividad</h3>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-0 custom-scrollbar">
+                      {logs.map((log, i) => (
+                          <div key={log.id} className={`p-3 text-xs border-b border-gray-50 flex gap-3 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold flex-shrink-0">
+                                  {getInitials(log.userName)}
+                              </div>
+                              <div className="flex-1">
+                                  <div className="font-bold text-slate-700">{log.action.replace(/_/g, ' ')}</div>
+                                  <div className="text-slate-500 truncate w-48" title={log.details}>{log.details}</div>
+                                  <div className="text-[10px] text-slate-400 mt-1">{new Date(log.timestamp).toLocaleTimeString()}</div>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+
+          </div>
+      </div>
+
+      {/* PIPELINE SECTION */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-4">
+              <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                  Pipeline
+                  <span className="bg-gray-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{processedBudgets.length}</span>
+              </h3>
+              <div className="flex bg-slate-100 p-0.5 rounded-lg border border-gray-200">
+                  <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md ${viewMode === 'list' ? 'bg-white shadow' : 'text-slate-400'}`}><LayoutListIcon /></button>
+                  <button onClick={() => setViewMode('kanban')} className={`p-1.5 rounded-md ${viewMode === 'kanban' ? 'bg-white shadow' : 'text-slate-400'}`}><LayoutKanbanIcon /></button>
+              </div>
+          </div>
+          <div className="flex gap-2 items-center">
+              <button onClick={handleExportCSV} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold border border-green-200 bg-green-50 text-green-700 hover:bg-green-100"><DownloadIcon /> CSV</button>
+              <div className="relative"><input className="pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-800" placeholder="Buscar..." value={filters.global} onChange={e => setFilters({...filters, global: e.target.value})} /><div className="absolute left-3 top-2.5 text-slate-400"><SearchIcon /></div></div>
           </div>
         </div>
-        <div className="overflow-x-auto w-full">
-          <table className="w-full text-sm text-left whitespace-nowrap">
-            <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold tracking-wider">
-              <tr>
-                <SortableHeader label="Nº Doc" sortKey="number" width="w-32" />
-                <SortableHeader label="Cliente" sortKey="client" />
-                <SortableHeader label="Fecha" sortKey="date" />
-                <SortableHeader label="Importe" sortKey="amount" />
-                <SortableHeader label="Estado" sortKey="status" />
-                <SortableHeader label="Comercial" sortKey="commercial" />
-                <th className="px-6 py-4 text-right">Acciones</th>
-              </tr>
-              {/* ADVANCED FILTER ROW */}
-              {showFilters && (
-                  <tr className="bg-slate-100/50 border-b border-gray-200 animate-in fade-in duration-200">
-                      <td className="px-6 py-2">
-                          <input 
-                            className="w-full text-xs p-1.5 border border-gray-300 rounded bg-white outline-none focus:border-slate-500"
-                            placeholder="Buscar Nº..."
-                            value={filters.number}
-                            onChange={e => setFilters({...filters, number: e.target.value})}
-                          />
-                      </td>
-                      <td className="px-6 py-2">
-                          <input 
-                            className="w-full text-xs p-1.5 border border-gray-300 rounded bg-white outline-none focus:border-slate-500"
-                            placeholder="Buscar Cliente..."
-                            value={filters.client}
-                            onChange={e => setFilters({...filters, client: e.target.value})}
-                          />
-                      </td>
-                      <td className="px-6 py-2">
-                          <div className="flex flex-col gap-1">
-                              <input 
-                                type="date" 
-                                className="w-full text-[10px] p-1 border border-gray-300 rounded bg-white outline-none"
-                                value={filters.dateStart}
-                                onChange={e => setFilters({...filters, dateStart: e.target.value})}
-                              />
-                              <input 
-                                type="date" 
-                                className="w-full text-[10px] p-1 border border-gray-300 rounded bg-white outline-none"
-                                value={filters.dateEnd}
-                                onChange={e => setFilters({...filters, dateEnd: e.target.value})}
-                              />
-                          </div>
-                      </td>
-                      <td className="px-6 py-2">
-                          <div className="flex gap-1">
-                              <input 
-                                type="number" 
-                                className="w-20 text-xs p-1.5 border border-gray-300 rounded bg-white outline-none"
-                                placeholder="Min €"
-                                value={filters.minAmount}
-                                onChange={e => setFilters({...filters, minAmount: e.target.value})}
-                              />
-                              <input 
-                                type="number" 
-                                className="w-20 text-xs p-1.5 border border-gray-300 rounded bg-white outline-none"
-                                placeholder="Max €"
-                                value={filters.maxAmount}
-                                onChange={e => setFilters({...filters, maxAmount: e.target.value})}
-                              />
-                          </div>
-                      </td>
-                      <td className="px-6 py-2">
-                          <select 
-                             className="w-full text-xs p-1.5 border border-gray-300 rounded bg-white outline-none cursor-pointer"
-                             value={filters.status}
-                             onChange={e => setFilters({...filters, status: e.target.value})}
-                          >
-                              <option value="all">Todos</option>
-                              <option value="draft">Borrador</option>
-                              <option value="pending">Pendiente</option>
-                              <option value="accepted">Aceptado</option>
-                              <option value="rejected">Rechazado</option>
-                          </select>
-                      </td>
-                      <td className="px-6 py-2">
-                          <input 
-                            className="w-full text-xs p-1.5 border border-gray-300 rounded bg-white outline-none focus:border-slate-500"
-                            placeholder="Comercial..."
-                            value={filters.commercial}
-                            onChange={e => setFilters({...filters, commercial: e.target.value})}
-                          />
-                      </td>
-                      <td className="px-6 py-2 text-right">
-                          <button 
-                            onClick={() => setFilters({ global: '', number: '', client: '', dateStart: '', dateEnd: '', minAmount: '', maxAmount: '', status: 'all', commercial: '' })}
-                            className="text-xs text-red-500 hover:text-red-700 underline font-medium"
-                          >
-                              Limpiar
-                          </button>
-                      </td>
-                  </tr>
-              )}
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {processedBudgets.map(budget => {
-                const total = calculateTotal(budget);
-                  
-                return (
-                  <tr 
-                    key={budget.id} 
-                    className="hover:bg-slate-50 transition-colors cursor-pointer group"
-                    onClick={(e) => handleEditClick(e, budget)}
-                  >
-                    <td className="px-6 py-4">
-                        <span className="font-mono font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded text-xs">{budget.number}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-full ${isSage ? 'bg-black' : 'bg-red-600'} flex items-center justify-center text-white text-xs font-bold`}>
-                                {getInitials(budget.clientData.commercialName || 'Unknown')}
+
+        {viewMode === 'list' ? (
+            <div className="overflow-x-auto w-full">
+            <table className="w-full text-sm text-left whitespace-nowrap">
+                <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold tracking-wider">
+                <tr><SortableHeader label="Nº Doc" sortKey="number" /><SortableHeader label="Cliente" sortKey="client" /><SortableHeader label="Fecha" sortKey="date" /><SortableHeader label="Importe" sortKey="amount" /><SortableHeader label="Estado" sortKey="status" /><SortableHeader label="Comercial" sortKey="commercial" /><th className="px-6 py-4 text-right">Acciones</th></tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                {processedBudgets.map(b => (
+                    <tr key={b.id} className="hover:bg-slate-50 cursor-pointer" onClick={(e) => handleEditClick(e, b)}>
+                        <td className="px-6 py-4"><span className="font-mono font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded text-xs">{b.number}</span></td>
+                        <td className="px-6 py-4 font-bold text-slate-800">{b.clientData.commercialName}</td>
+                        <td className="px-6 py-4 text-slate-500 text-xs">{new Date(b.createdAt).toLocaleDateString()}</td>
+                        <td className="px-6 py-4 font-bold font-mono text-slate-800">{calculateTotal(b).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</td>
+                        <td className="px-6 py-4"><span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${b.status === 'accepted' ? 'bg-green-100 text-green-800' : b.status === 'pending' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'}`}>{b.status}</span></td>
+                        <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
+                                    {getInitials(b.creatorName || 'S')}
+                                </div>
+                                <span className="text-xs text-slate-600">{b.creatorName || 'Sistema'}</span>
                             </div>
-                            <div>
-                                <div className="font-bold text-slate-800">{budget.clientData.commercialName}</div>
-                                <div className="text-xs text-slate-400">{budget.clientData.email}</div>
-                            </div>
-                        </div>
-                    </td>
-                    <td className="px-6 py-4 text-slate-500 text-xs font-medium uppercase">
-                        {new Date(budget.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 text-slate-800 font-bold font-mono">
-                        {total.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                        ${budget.status === 'accepted' ? 'bg-green-100 text-green-800' : 
-                          budget.status === 'rejected' ? 'bg-red-100 text-red-800' : 
-                          budget.status === 'draft' ? 'bg-gray-100 text-gray-800' :
-                          'bg-orange-100 text-orange-800'}`}>
-                        {budget.status === 'draft' ? 'Borrador' :
-                         budget.status === 'pending' ? 'Pendiente' :
-                         budget.status === 'accepted' ? 'Aceptado' : 'Rechazado'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                         <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
-                                {getInitials(budget.creatorName || 'Sistema')}
-                            </div>
-                            <span className="text-xs font-medium text-slate-600 truncate max-w-[100px]">{budget.creatorName || 'Sistema'}</span>
-                         </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {/* Action buttons always visible now */}
-                      <div className="flex items-center justify-end gap-1 opacity-100">
-                        <button 
-                          type="button"
-                          onClick={(e) => handleDuplicate(e, budget)}
-                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Duplicar"
-                        >
-                          <CopyIcon />
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={(e) => handleEditClick(e, budget)}
-                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Editar"
-                        >
-                          <EditIcon />
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={(e) => handleDelete(e, budget.id)}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Eliminar"
-                        >
-                          <TrashIcon />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {processedBudgets.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-8 py-16 text-center text-slate-400 flex flex-col items-center gap-3">
-                    <div className="bg-slate-50 p-4 rounded-full">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-                    </div>
-                    <span className="font-medium">No se encontraron presupuestos con estos criterios.</span>
-                    {(filters.global !== '' || showFilters) ? (
-                         <button onClick={() => setFilters({ global: '', number: '', client: '', dateStart: '', dateEnd: '', minAmount: '', maxAmount: '', status: 'all', commercial: '' })} className="text-accent text-sm font-bold hover:underline">Limpiar Filtros</button>
-                    ) : (
-                        <button onClick={onNewBudget} className="text-accent text-sm font-bold hover:underline">Crear el primero ahora</button>
-                    )}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                        </td>
+                        <td className="px-6 py-4 text-right"><div className="flex justify-end gap-2"><button onClick={(e) => handleDuplicate(e, b)} className="p-2 hover:bg-blue-50 text-blue-600 rounded"><CopyIcon /></button><button onClick={(e) => handleDelete(e, b.id)} className="p-2 hover:bg-red-50 text-red-600 rounded"><TrashIcon /></button></div></td>
+                    </tr>
+                ))}
+                </tbody>
+            </table>
+            </div>
+        ) : (
+            <div className="flex gap-4 p-6 overflow-x-auto min-h-[600px] bg-slate-50/50">
+                <KanbanColumn status="draft" title="Borradores" colorClass="text-slate-600 bg-slate-200" items={processedBudgets.filter(b => b.status === 'draft')} />
+                <KanbanColumn status="pending" title="Pendientes" colorClass="text-orange-600 bg-orange-200" items={processedBudgets.filter(b => b.status === 'pending')} />
+                <KanbanColumn status="accepted" title="Ganados" colorClass="text-green-600 bg-green-200" items={processedBudgets.filter(b => b.status === 'accepted')} />
+            </div>
+        )}
       </div>
     </div>
   );

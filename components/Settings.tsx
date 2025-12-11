@@ -1,15 +1,20 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storage';
 import { authService } from '../services/auth';
-import { CompanyProfile, CloudConfig } from '../types';
+import { CompanyProfile, CloudConfig, AppTheme } from '../types';
 
 export const Settings: React.FC = () => {
   const [company, setCompany] = useState<CompanyProfile>({ name: '', cif: '', address: '', email: '', phone: '', terms: '' });
   const [cloud, setCloud] = useState<CloudConfig>({ apiKey: '', authDomain: '', projectId: '', enabled: false });
   const [connectionStatus, setConnectionStatus] = useState<{success?: boolean, message?: string} | null>(null);
   const [isTesting, setIsTesting] = useState(false);
-  const [user] = useState(authService.getSession());
+  const [user, setUser] = useState(authService.getSession());
+  
+  // Theme & Goals state
+  const [selectedTheme, setSelectedTheme] = useState<AppTheme>(user?.themePreference || 'classic');
+  const [monthlyGoal, setMonthlyGoal] = useState<number>(user?.monthlyGoal || 0);
 
   useEffect(() => {
     setCompany(storageService.getCompanyProfile());
@@ -19,6 +24,16 @@ export const Settings: React.FC = () => {
   const handleSaveCompany = () => {
     storageService.saveCompanyProfile(company);
     alert('Datos de empresa guardados correctamente.');
+  };
+
+  const handleSavePreferences = () => {
+      if(user) {
+          const updatedUser = { ...user, themePreference: selectedTheme, monthlyGoal: monthlyGoal };
+          storageService.saveUser(updatedUser);
+          authService.setSession(updatedUser);
+          setUser(updatedUser);
+          alert('Preferencias actualizadas. La interfaz se actualizará automáticamente.');
+      }
   };
 
   const handleSaveCloud = () => {
@@ -95,6 +110,57 @@ export const Settings: React.FC = () => {
   return (
     <div className="space-y-8 pb-12">
       <h2 className="text-2xl font-bold text-primary">Configuración Global</h2>
+
+      {/* PERSONAL PREFERENCES */}
+      <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex justify-between items-center mb-4 border-b pb-2">
+              <h3 className="text-lg font-bold text-slate-800">Mis Preferencias</h3>
+              <button onClick={handleSavePreferences} className="bg-slate-900 text-white px-4 py-2 rounded text-sm font-medium hover:bg-slate-700">Guardar Mis Ajustes</button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                  <label className="block text-sm font-bold text-slate-600 mb-3">Tema Visual</label>
+                  <div className="grid grid-cols-3 gap-4">
+                      <div 
+                        onClick={() => setSelectedTheme('classic')}
+                        className={`cursor-pointer border-2 rounded-lg p-2 flex flex-col gap-2 ${selectedTheme === 'classic' ? 'border-slate-800 bg-slate-50' : 'border-gray-200 hover:border-gray-300'}`}
+                      >
+                          <div className="h-8 bg-slate-900 rounded"></div>
+                          <div className="text-xs text-center font-bold text-slate-700">Clásico</div>
+                      </div>
+                      <div 
+                        onClick={() => setSelectedTheme('ocean')}
+                        className={`cursor-pointer border-2 rounded-lg p-2 flex flex-col gap-2 ${selectedTheme === 'ocean' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}
+                      >
+                          <div className="h-8 bg-indigo-900 rounded"></div>
+                          <div className="text-xs text-center font-bold text-indigo-700">Océano</div>
+                      </div>
+                      <div 
+                        onClick={() => setSelectedTheme('midnight')}
+                        className={`cursor-pointer border-2 rounded-lg p-2 flex flex-col gap-2 ${selectedTheme === 'midnight' ? 'border-zinc-800 bg-zinc-50' : 'border-gray-200 hover:border-gray-300'}`}
+                      >
+                          <div className="h-8 bg-zinc-950 rounded"></div>
+                          <div className="text-xs text-center font-bold text-zinc-700">Noche</div>
+                      </div>
+                  </div>
+              </div>
+
+              <div>
+                  <label className="block text-sm font-bold text-slate-600 mb-3">Objetivo Mensual de Ventas (Gamificación)</label>
+                  <div className="relative">
+                      <input 
+                        type="number" 
+                        className="w-full border border-gray-300 rounded-lg p-3 text-slate-900 font-mono font-bold pl-8 focus:ring-2 focus:ring-slate-900 outline-none"
+                        value={monthlyGoal}
+                        onChange={(e) => setMonthlyGoal(parseFloat(e.target.value))}
+                      />
+                      <span className="absolute left-3 top-3 text-slate-400">€</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">Introduce tu meta de facturación mensual para ver la barra de progreso en el Dashboard.</p>
+              </div>
+          </div>
+      </section>
 
       {/* Cloud Sync - ONLY ADMIN */}
       {authService.isAdmin(user) && (

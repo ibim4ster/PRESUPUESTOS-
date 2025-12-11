@@ -3,6 +3,7 @@
 export type SystemType = 'agora' | 'sage' | 'sage200' | 'sagedespachos';
 
 export type UserRole = 'admin' | 'commercial';
+export type AppTheme = 'classic' | 'ocean' | 'midnight'; // New Theme Type
 
 export interface User {
   id: string;
@@ -11,6 +12,8 @@ export interface User {
   name: string;
   role: UserRole;
   createdAt: string;
+  themePreference?: AppTheme; // New
+  monthlyGoal?: number; // New: Gamification
 }
 
 export interface LogEntry {
@@ -18,8 +21,20 @@ export interface LogEntry {
   timestamp: string;
   userId: string;
   userName: string;
-  action: string; // 'LOGIN', 'CREATE_BUDGET', 'DELETE_CLIENT', etc.
+  action: string; 
   details: string;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  dueDate: string; // ISO Date
+  completed: boolean;
+  priority: 'low' | 'normal' | 'high';
+  assignedTo: string; // User ID
+  relatedClientId?: string;
+  relatedBudgetId?: string;
+  relatedBudgetNumber?: string;
 }
 
 export interface Product {
@@ -27,8 +42,12 @@ export interface Product {
   reference: string;
   description: string;
   price: number;
-  image?: string; // Base64
-  system: SystemType | 'both'; // 'both' is kept for backward compatibility, though specific assignment is preferred
+  costPrice?: number; 
+  category?: string; // New: Product Categorization
+  image?: string; 
+  system: SystemType | 'both'; 
+  isRecurring?: boolean; 
+  frequency?: 'monthly' | 'yearly';
 }
 
 export interface ProductKitItem {
@@ -38,7 +57,7 @@ export interface ProductKitItem {
 
 export interface ProductKit {
   id: string;
-  reference: string; // Kit Name
+  reference: string; 
   description: string;
   items: ProductKitItem[];
   system: SystemType | 'both';
@@ -47,50 +66,64 @@ export interface ProductKit {
 export interface Client {
   id: string;
   commercialName: string;
-  legalName: string; // Razón Social
+  legalName: string; 
   cif: string;
   address: string;
   email: string;
   phone: string;
   paymentMethod: string;
+  notes?: string; 
 }
 
 export interface LineItem {
   id: string;
   type: 'product' | 'section'; 
   productId?: string;
-  reference: string; // Empty if section
-  description: string; // Title if section
-  units: number; // 0 if section
-  price: number; // 0 if section
+  reference: string; 
+  description: string; 
+  units: number; 
+  price: number; 
+  discount?: number; 
   image?: string;
+  isRecurring?: boolean; 
+}
+
+export interface BudgetEvent {
+    id: string;
+    timestamp: string;
+    authorName: string;
+    text: string;
+    type: 'note' | 'status_change' | 'creation';
 }
 
 export interface Budget {
   id: string;
-  number: string; // Sequential ID
-  createdAt: string; // ISO Date
+  number: string; 
+  createdAt: string; 
   updatedAt: string;
   status: 'draft' | 'pending' | 'accepted' | 'rejected';
   clientId: string;
-  clientData: Client; // Snapshot of client data at time of creation
+  clientData: Client; 
   validityDays: number;
   
   system: SystemType; 
   
-  // Attribution
-  createdBy?: string; // User ID
-  creatorName?: string; // Name Snapshot
+  createdBy?: string; 
+  creatorName?: string; 
 
   lineItems: LineItem[];
   
-  // Financials
   discountPercentage: number;
-  bonusAmount: number; // Subvención (fixed amount)
+  bonusAmount: number; 
   taxPercentage: number;
+  withholdingTax?: number; 
   
-  clientSignature?: string; // Base64 image
-  internalNotes?: string; // Notes not visible to client
+  clientSignature?: string; 
+  internalNotes?: string; 
+  events?: BudgetEvent[]; 
+  
+  parentBudgetId?: string;
+  version?: number;
 }
 
 export interface CompanyProfile {
@@ -99,8 +132,8 @@ export interface CompanyProfile {
   address: string;
   email: string;
   phone: string;
-  logo?: string; // Base64
-  terms: string; // Default terms
+  logo?: string; 
+  terms: string; 
 }
 
 export interface CustomLegalText {
@@ -109,12 +142,12 @@ export interface CustomLegalText {
   active: boolean;
 }
 
-// New Structure: Separate configs per system
 export interface PdfSystemConfig {
   primaryColor: string; 
   secondaryColor: string; 
   
   // Toggles
+  showCoverPage: boolean; 
   showLogo: boolean;
   showCompanyDetails: boolean;
   showImages: boolean;
@@ -124,6 +157,8 @@ export interface PdfSystemConfig {
   showQr: boolean;
 
   // Custom Texts
+  coverTitle?: string; 
+  coverSubtitle?: string; 
   titleText: string; 
   footerText: string;
   
@@ -131,15 +166,15 @@ export interface PdfSystemConfig {
   customLegalTexts: CustomLegalText[]; 
 
   partnerLogos: {
-    slot1?: string; // Agora: Agora / Sage: Partner 1
-    slot2?: string; // Agora: Concord / Sage: Partner 2
-    slot3?: string; // Agora: Cashlogy / Sage: Partner 3
+    slot1?: string; 
+    slot2?: string; 
+    slot3?: string; 
   };
 }
 
 export interface PdfConfig {
   agora: PdfSystemConfig;
-  sage: PdfSystemConfig; // Sage 50
+  sage: PdfSystemConfig; 
   sage200: PdfSystemConfig;
   sagedespachos: PdfSystemConfig;
 }

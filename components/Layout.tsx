@@ -1,6 +1,7 @@
 
+
 import React, { useState } from 'react';
-import { SystemType, User } from '../types';
+import { SystemType, User, AppTheme } from '../types';
 import { authService } from '../services/auth';
 
 interface LayoutProps {
@@ -33,7 +34,7 @@ const NavItem = ({ id, label, icon: Icon, active, onClick, highlight = false }: 
         ? 'bg-white/10 text-white shadow-sm' 
         : highlight 
             ? 'text-red-300 hover:bg-white/5 hover:text-white'
-            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            : 'text-white/60 hover:bg-white/5 hover:text-white'
     }`}
   >
     <Icon />
@@ -49,25 +50,27 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate
     setIsMobileMenuOpen(false); // Close menu on selection
   };
 
-  const isSage = currentSystem.startsWith('sage');
-  const themeColor = isSage ? 'bg-black' : 'bg-slate-900';
-  const accentColor = isSage ? 'bg-[#00d061]' : 'bg-red-600';
-  const accentText = isSage ? 'text-[#00d061]' : 'text-red-500';
-
-  const systemLabel = {
-    agora: 'Ágora',
-    sage: 'Sage 50',
-    sage200: 'Sage 200',
-    sagedespachos: 'Sage Despachos'
-  };
+  // --- THEME LOGIC ---
+  const theme = user.themePreference || 'classic';
+  
+  let themeClass = 'bg-slate-900'; // Default Classic
+  let logoColor = 'bg-red-600';
+  
+  if (theme === 'ocean') {
+      themeClass = 'bg-indigo-900';
+      logoColor = 'bg-cyan-500';
+  } else if (theme === 'midnight') {
+      themeClass = 'bg-zinc-950';
+      logoColor = 'bg-purple-600';
+  }
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       
       {/* Mobile Header */}
-      <div className={`lg:hidden fixed top-0 left-0 right-0 h-16 ${themeColor} text-white z-30 flex items-center justify-between px-4 shadow-md transition-colors duration-300`}>
+      <div className={`lg:hidden fixed top-0 left-0 right-0 h-16 ${themeClass} text-white z-30 flex items-center justify-between px-4 shadow-md transition-colors duration-300`}>
         <div className="flex items-center gap-2">
-            <div className={`w-8 h-8 ${accentColor} rounded-lg flex items-center justify-center text-white text-lg font-bold`}>G</div>
+            <div className={`w-8 h-8 ${logoColor} rounded-lg flex items-center justify-center text-white text-lg font-bold`}>G</div>
             <span className="font-bold text-lg">Gravity</span>
         </div>
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2">
@@ -85,40 +88,40 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate
 
       {/* Sidebar */}
       <aside className={`
-        fixed lg:static inset-y-0 left-0 w-64 ${themeColor} text-white flex flex-col flex-shrink-0 shadow-2xl z-40 transition-all duration-300 ease-in-out
+        fixed lg:static inset-y-0 left-0 w-64 ${themeClass} text-white flex flex-col flex-shrink-0 shadow-2xl z-40 transition-all duration-300 ease-in-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         <div className="p-6 border-b border-white/10">
           <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            <div className={`w-8 h-8 ${accentColor} rounded-lg flex items-center justify-center text-white text-lg transition-colors duration-300`}>G</div>
+            <div className={`w-8 h-8 ${logoColor} rounded-lg flex items-center justify-center text-white text-lg transition-colors duration-300 shadow-lg`}>G</div>
             <span>Gravity</span>
           </h1>
           
           <div className="mt-4 flex items-center gap-2 bg-white/5 p-2 rounded-lg border border-white/10">
-             <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center text-xs font-bold text-white">
+             <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-xs font-bold text-white">
                  {user.name.charAt(0).toUpperCase()}
              </div>
              <div className="overflow-hidden">
                  <div className="text-xs font-bold truncate">{user.name}</div>
-                 <div className="text-[10px] text-slate-400 capitalize">{user.role === 'admin' ? 'Administrador' : 'Comercial'}</div>
+                 <div className="text-[10px] text-white/50 capitalize">{user.role === 'admin' ? 'Administrador' : 'Comercial'}</div>
              </div>
           </div>
 
           {/* System Switcher Dropdown */}
           <div className="mt-4">
-             <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Sistema Activo</label>
+             <label className="text-[10px] uppercase font-bold text-white/40 mb-1 block">Sistema Activo</label>
              <div className="relative">
                 <select 
                     value={currentSystem}
                     onChange={(e) => onSystemChange(e.target.value as SystemType)}
-                    className="w-full bg-white/10 border border-white/20 rounded-lg p-2.5 text-sm font-bold text-white appearance-none cursor-pointer hover:bg-white/20 transition-colors focus:ring-2 focus:ring-[#00d061] outline-none"
+                    className="w-full bg-white/10 border border-white/20 rounded-lg p-2.5 text-sm font-bold text-white appearance-none cursor-pointer hover:bg-white/20 transition-colors focus:ring-2 focus:ring-white/30 outline-none"
                 >
                     <option value="agora" className="text-slate-900 font-bold">ÁGORA</option>
                     <option value="sage" className="text-slate-900 font-bold">SAGE 50</option>
                     <option value="sage200" className="text-slate-900 font-bold">SAGE 200</option>
                     <option value="sagedespachos" className="text-slate-900 font-bold">SAGE DESPACHOS</option>
                 </select>
-                <div className="absolute right-3 top-3 pointer-events-none">
+                <div className="absolute right-3 top-3 pointer-events-none text-white/70">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
                 </div>
              </div>
@@ -172,7 +175,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate
           {authService.isAdmin(user) && (
              <>
              <div className="pt-4 pb-2 border-t border-white/10 mt-4">
-                 <p className="px-4 text-[10px] font-bold text-slate-500 uppercase">Administración</p>
+                 <p className="px-4 text-[10px] font-bold text-white/40 uppercase">Administración</p>
              </div>
              <NavItem 
                 id="admin-panel" 
@@ -189,7 +192,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate
         <div className="p-4 border-t border-white/10">
           <button 
              onClick={onLogout}
-             className="w-full flex items-center justify-center space-x-2 p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+             className="w-full flex items-center justify-center space-x-2 p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors"
           >
              <LogOutIcon />
              <span className="text-xs font-bold uppercase">Cerrar Sesión</span>
