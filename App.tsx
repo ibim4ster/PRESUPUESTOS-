@@ -15,9 +15,6 @@ import { Budget, SystemType, User } from './types';
 import { storageService } from './services/storage';
 import { authService } from './services/auth';
 
-// Valid Sound (Short "Ding" Notification)
-const NOTIFICATION_SOUND = "data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//uQZATM8z1jW90wQAAAAAA0gAAABH2Nb3TBAAAAAADSAAAAENMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv/7kGQAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAAAGkH8mAAAAACAAJ0AAAAKex/Wc0wQAAAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV";
-
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState('dashboard');
@@ -54,11 +51,62 @@ function App() {
       return unsub;
   }, [user]);
 
-  const playNotificationSound = () => {
+  const playNotificationSound = (type: 'success' | 'error' | 'system' = 'system') => {
       try {
-          const audio = new Audio(NOTIFICATION_SOUND);
-          audio.volume = 0.4;
-          audio.play().catch(e => console.error("Audio block:", e));
+          const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+          if (!AudioContext) return;
+          
+          const ctx = new AudioContext();
+          const now = ctx.currentTime;
+          const gain = ctx.createGain();
+          
+          // Connect to output
+          gain.connect(ctx.destination);
+
+          if (type === 'error') {
+              // Subtle "Bonk" (Low sine wave, quick decay)
+              const osc = ctx.createOscillator();
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(150, now);
+              osc.frequency.linearRampToValueAtTime(100, now + 0.1);
+              
+              gain.gain.setValueAtTime(0.05, now); // Very low volume
+              gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+              
+              osc.connect(gain);
+              osc.start(now);
+              osc.stop(now + 0.15);
+          } else if (type === 'success') {
+               // Soft "Ding" (Glassy)
+              const osc = ctx.createOscillator();
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(1200, now);
+              
+              gain.gain.setValueAtTime(0, now);
+              gain.gain.linearRampToValueAtTime(0.03, now + 0.02); // Soft attack
+              gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+              
+              osc.connect(gain);
+              osc.start(now);
+              osc.stop(now + 0.4);
+          } else {
+              // SYSTEM SWITCH: "The Apple Pop" / "Water Drop"
+              // Very high pitch, very short, sine wave, very low volume.
+              const osc = ctx.createOscillator();
+              osc.type = 'sine';
+              
+              // Start slightly lower and go high quickly (Pop effect)
+              osc.frequency.setValueAtTime(750, now);
+              
+              // Envelope: Instant attack, extremely fast decay
+              gain.gain.setValueAtTime(0, now);
+              gain.gain.linearRampToValueAtTime(0.04, now + 0.005); // 5ms attack
+              gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1); // 100ms total duration
+              
+              osc.connect(gain);
+              osc.start(now);
+              osc.stop(now + 0.1);
+          }
       } catch(e) {
           console.error("Audio error:", e);
       }
@@ -71,8 +119,8 @@ function App() {
       // 1. Set Visible
       setNotification({ show: true, type, text, subtext });
       
-      // 2. Play Sound for errors or system (optional for simple success to avoid spam)
-      if (type === 'error') playNotificationSound();
+      // 2. Play Sound
+      playNotificationSound(type);
 
       // 3. Schedule Hide (Animation Out)
       notificationTimeoutRef.current = window.setTimeout(() => {
@@ -82,7 +130,7 @@ function App() {
 
   const handleSystemChange = (newSystem: SystemType) => {
       setCurrentSystem(newSystem);
-      playNotificationSound();
+      playNotificationSound('system');
 
       if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
       
@@ -177,9 +225,10 @@ function App() {
       </Layout>
 
       {/* PREMIUM NOTIFICATION COMPONENT */}
-      {/* Note: We keep 'notification' in the DOM but control visibility with classes */}
       <div 
-        className={`fixed top-6 left-1/2 transform -translate-x-1/2 z-[100] transition-all duration-500 ease-in-out ${notification?.show ? 'translate-y-0 opacity-100' : '-translate-y-24 opacity-0 pointer-events-none'}`}
+        className={`fixed top-6 left-1/2 transform -translate-x-1/2 z-[100] transition-all duration-500 ease-in-out pointer-events-none
+            ${notification?.show ? 'translate-y-0 opacity-100' : '-translate-y-24 opacity-0'}
+        `}
       >
           {notification && (
             <div className={`

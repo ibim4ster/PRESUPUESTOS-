@@ -46,7 +46,11 @@ export const CalendarView: React.FC = () => {
   const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
 
   const getEventsForDay = (day: number) => {
-      const dateStr = new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toISOString().split('T')[0];
+      // Create comparison string YYYY-MM-DD manually to avoid timezone issues
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+      
       const dayBudgets = budgets.filter(b => {
           const bDate = new Date(b.createdAt);
           const expiryDate = new Date(bDate.setDate(bDate.getDate() + b.validityDays));
@@ -58,14 +62,20 @@ export const CalendarView: React.FC = () => {
 
   // HANDLERS
   const handleDayClick = (day: number) => {
-      const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-      // Correct timezone offset for form input
-      const offset = date.getTimezoneOffset();
-      const adjustedDate = new Date(date.getTime() - (offset*60*1000));
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth(); // 0-indexed for Date constructor
       
-      setSelectedDay(date);
+      const dateObj = new Date(year, month, day);
+      setSelectedDay(dateObj);
+      
+      // Construct the string manually for the input to ensure it is EXACTLY the clicked day
+      // Avoid new Date(dateStr) -> .toISOString() conversions that might shift based on Timezone
+      const monthStr = (month + 1).toString().padStart(2, '0');
+      const dayStr = day.toString().padStart(2, '0');
+      const cleanDateStr = `${year}-${monthStr}-${dayStr}`;
+
       setEditingTask(null);
-      setTaskForm({ title: '', date: adjustedDate.toISOString().split('T')[0], priority: 'normal', completed: false });
+      setTaskForm({ title: '', date: cleanDateStr, priority: 'normal', completed: false });
       setShowModal(true);
   };
 
@@ -85,10 +95,15 @@ export const CalendarView: React.FC = () => {
       e.preventDefault();
       if(!currentUser || !taskForm.title) return;
 
+      // Force the time to NOON (12:00) to safely avoid Midnight timezone shifts
+      // When we read it back with .split('T')[0], it will always be the correct day
+      const safeDate = new Date(taskForm.date);
+      safeDate.setHours(12, 0, 0, 0);
+
       const taskToSave: Task = {
           id: editingTask ? editingTask.id : crypto.randomUUID(),
           title: taskForm.title,
-          dueDate: new Date(taskForm.date).toISOString(),
+          dueDate: safeDate.toISOString(),
           priority: taskForm.priority,
           completed: taskForm.completed,
           assignedTo: currentUser.id,
