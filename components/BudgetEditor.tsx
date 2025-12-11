@@ -1,9 +1,8 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { storageService } from '../services/storage';
 import { generateBudgetPdf } from '../services/pdfGenerator';
-import { Budget, Client, LineItem, Product, PdfConfig, SystemType, ProductKit, User, BudgetEvent } from '../types';
+import { Budget, Client, LineItem, Product, PdfConfig, SystemType, ProductKit, User, BudgetEvent, PaymentTerm } from '../types';
 import { SearchableSelect } from './SearchableSelect';
 
 interface BudgetEditorProps {
@@ -11,7 +10,7 @@ interface BudgetEditorProps {
   onClose: () => void;
   currentSystem: SystemType;
   currentUser: User; 
-  onShowToast: (text: string, type: 'success' | 'error', subtext?: string) => void; // New prop for Toasts
+  onShowToast: (text: string, type: 'success' | 'error', subtext?: string) => void; 
 }
 
 // Icons
@@ -28,6 +27,10 @@ const MailIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height
 const SendIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>;
 const RefreshIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>;
 const GitBranchIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>;
+const TrendingUpIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>;
+const PieChartIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>;
+const EyeOffIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07-2.3 2.3"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
+const CalendarIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
 
 const SignaturePad = ({ onSave, onClear, initial }: { onSave: (data: string) => void, onClear: () => void, initial?: string }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -145,6 +148,9 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [newEventText, setNewEventText] = useState('');
+  
+  // Profitability Widget State
+  const [showProfitability, setShowProfitability] = useState(false);
 
   // --- KEYBOARD SHORTCUTS ---
   useEffect(() => {
@@ -229,17 +235,55 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
 
   const addLineItem = () => { }; 
   const addSectionItem = () => { const newItem: LineItem = { id: crypto.randomUUID(), type: 'section', reference: '', description: 'NUEVA SECCIÓN', units: 0, price: 0 }; updateBudget({ lineItems: [...budget.lineItems, newItem] }); };
-  const addProductAsLine = (product: Product) => { const newItem: LineItem = { id: crypto.randomUUID(), type: 'product', productId: product.id, reference: product.reference, description: product.description, price: product.price, image: product.image, units: 1, discount: 0, isRecurring: product.isRecurring }; updateBudget({ lineItems: [...budget.lineItems, newItem] }); };
+  
+  // UPDATED: Now includes costPrice
+  const addProductAsLine = (product: Product) => { 
+      const newItem: LineItem = { 
+          id: crypto.randomUUID(), 
+          type: 'product', 
+          productId: product.id, 
+          reference: product.reference, 
+          description: product.description, 
+          price: product.price, 
+          costPrice: product.costPrice || 0, // COPY COST PRICE
+          image: product.image, 
+          units: 1, 
+          discount: 0, 
+          isRecurring: product.isRecurring 
+      }; 
+      updateBudget({ lineItems: [...budget.lineItems, newItem] }); 
+  };
+
+  // UPDATED: Now includes costPrice
   const addKitAsLines = (kit: ProductKit) => {
       const section: LineItem = { id: crypto.randomUUID(), type: 'section', reference: '', description: kit.reference.toUpperCase(), units: 0, price: 0 };
       const newItems: LineItem[] = [section];
-      kit.items.forEach(item => { const prod = products.find(p => p.id === item.productId); if (prod) { newItems.push({ id: crypto.randomUUID(), type: 'product', productId: prod.id, reference: prod.reference, description: prod.description, price: prod.price, image: prod.image, units: item.units, discount: 0, isRecurring: prod.isRecurring }); } });
+      kit.items.forEach(item => { 
+          const prod = products.find(p => p.id === item.productId); 
+          if (prod) { 
+              newItems.push({ 
+                  id: crypto.randomUUID(), 
+                  type: 'product', 
+                  productId: prod.id, 
+                  reference: prod.reference, 
+                  description: prod.description, 
+                  price: prod.price, 
+                  costPrice: prod.costPrice || 0, // COPY COST PRICE
+                  image: prod.image, 
+                  units: item.units, 
+                  discount: 0, 
+                  isRecurring: prod.isRecurring 
+              }); 
+          } 
+      });
       updateBudget({ lineItems: [...budget.lineItems, ...newItems] });
   };
+
   const updateLineItem = (id: string, updates: Partial<LineItem>) => { const newLines = budget.lineItems.map(item => item.id === id ? { ...item, ...updates } : item); updateBudget({ lineItems: newLines }); };
   const removeLineItem = (id: string) => { updateBudget({ lineItems: budget.lineItems.filter(i => i.id !== id) }); };
   const moveLineItem = (index: number, direction: 'up' | 'down') => { const newLines = [...budget.lineItems]; if (direction === 'up' && index > 0) { [newLines[index], newLines[index - 1]] = [newLines[index - 1], newLines[index]]; } else if (direction === 'down' && index < newLines.length - 1) { [newLines[index], newLines[index + 1]] = [newLines[index + 1], newLines[index]]; } updateBudget({ lineItems: newLines }); };
 
+  // --- CALCULATIONS ---
   const productItems = budget.lineItems.filter(i => i.type !== 'section');
   const subtotal = productItems.reduce((acc, item) => { const disc = item.discount || 0; const finalPrice = item.price * (1 - disc / 100); return acc + (item.units * finalPrice); }, 0);
   const discountAmount = subtotal * (budget.discountPercentage / 100);
@@ -248,6 +292,53 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
   const taxAmount = taxableBase * (budget.taxPercentage / 100);
   const withholdingAmount = taxableBase * ((budget.withholdingTax || 0) / 100);
   const total = taxableBase + taxAmount - withholdingAmount;
+
+  // --- PROFITABILITY CALCULATION ---
+  const totalCost = productItems.reduce((acc, item) => acc + (item.units * (item.costPrice || 0)), 0);
+  const netProfit = taxableBase - totalCost;
+  const marginPercentage = taxableBase > 0 ? (netProfit / taxableBase) * 100 : 0;
+  
+  let marginColor = 'text-gray-500';
+  let marginBg = 'bg-gray-100';
+  if (marginPercentage > 30) { marginColor = 'text-green-600'; marginBg = 'bg-green-100'; }
+  else if (marginPercentage > 15) { marginColor = 'text-orange-600'; marginBg = 'bg-orange-100'; }
+  else { marginColor = 'text-red-600'; marginBg = 'bg-red-100'; }
+
+  // --- PAYMENT TERMS LOGIC ---
+  const handleAddPaymentTerm = () => {
+      const currentTerms = budget.paymentTerms || [];
+      const remainingAmount = total - currentTerms.reduce((s, t) => s + t.amount, 0);
+      const remainingPercent = Math.max(0, 100 - currentTerms.reduce((s, t) => s + t.percentage, 0));
+      
+      const newTerm: PaymentTerm = {
+          id: crypto.randomUUID(),
+          concept: currentTerms.length === 0 ? 'Firma del Presupuesto' : 'Entrega / Finalización',
+          percentage: remainingPercent,
+          amount: remainingAmount
+      };
+      updateBudget({ paymentTerms: [...currentTerms, newTerm] });
+  };
+  
+  const updatePaymentTerm = (id: string, field: keyof PaymentTerm, value: any) => {
+      const currentTerms = budget.paymentTerms || [];
+      const updatedTerms = currentTerms.map(t => {
+          if (t.id !== id) return t;
+          const updated = { ...t, [field]: value };
+          // Auto-calculate logic
+          if (field === 'percentage') {
+              updated.amount = total * (value / 100);
+          } else if (field === 'amount') {
+              updated.percentage = (value / total) * 100;
+          }
+          return updated;
+      });
+      updateBudget({ paymentTerms: updatedTerms });
+  };
+
+  const removePaymentTerm = (id: string) => {
+      updateBudget({ paymentTerms: (budget.paymentTerms || []).filter(t => t.id !== id) });
+  };
+
 
   const handleGeneratePDF = () => { saveWithLogs(); const doc = generateBudgetPdf(budget, company, pdfConfig); const fileName = `Presupuesto_${budget.number}_${budget.clientData.commercialName}.pdf`; doc.save(fileName); };
   const handlePreview = () => { saveWithLogs(); try { const doc = generateBudgetPdf(budget, company, pdfConfig); const blob = doc.output('blob'); const url = URL.createObjectURL(blob); setPreviewUrl(url); setShowPreviewModal(true); } catch (e) { onShowToast("Error generando vista previa", 'error'); } };
@@ -297,12 +388,28 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
             </div>
             <div className="md:col-span-5 bg-slate-50 p-5 rounded-xl border border-gray-200 shadow-sm">
               <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">Datos del Documento</h3>
-              <div className="space-y-4"><div><label className="block text-xs font-bold text-slate-500 mb-1">Número</label><input className="w-full bg-white text-slate-900 border border-gray-300 rounded-md font-mono text-sm p-2" value={budget.number} onChange={e => updateBudget({ number: e.target.value })} /></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-slate-500 mb-1">Estado</label><select className="w-full bg-white text-slate-900 border border-gray-300 rounded-md text-sm p-2" value={budget.status} onChange={e => updateBudget({ status: e.target.value as any })}><option value="draft">Borrador</option><option value="pending">Pendiente</option><option value="accepted">Aceptado</option><option value="rejected">Rechazado</option></select></div><div><label className="block text-xs font-bold text-slate-500 mb-1">Validez</label><div className="relative"><input type="number" className="w-full bg-white text-slate-900 border border-gray-300 rounded-md text-sm pr-8 p-2" value={budget.validityDays} onChange={e => updateBudget({ validityDays: parseInt(e.target.value) })} /><span className="absolute right-2 top-2 text-xs text-slate-400">días</span></div></div></div><div><label className="block text-xs font-bold text-slate-500 mb-1">Comercial</label><div className="bg-slate-100 rounded p-2 text-xs font-mono text-slate-600">{budget.creatorName || currentUser.name}</div></div></div>
+              <div className="space-y-4">
+                  <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">Número</label>
+                      <input className="w-full bg-white text-slate-900 border border-gray-300 rounded-md font-mono text-sm p-2" value={budget.number} onChange={e => updateBudget({ number: e.target.value })} />
+                  </div>
+                  <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">Validez</label>
+                      <div className="relative">
+                          <input type="number" className="w-full bg-white text-slate-900 border border-gray-300 rounded-md text-sm pr-8 p-2" value={budget.validityDays} onChange={e => updateBudget({ validityDays: parseInt(e.target.value) })} />
+                          <span className="absolute right-2 top-2 text-xs text-slate-400">días</span>
+                      </div>
+                  </div>
+                  <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">Comercial</label>
+                      <div className="bg-slate-100 rounded p-2 text-xs font-mono text-slate-600">{budget.creatorName || currentUser.name}</div>
+                  </div>
+              </div>
             </div>
           </section>
 
-          <section className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-            <div className="p-4 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4"><h3 className="text-lg font-bold text-slate-800">Conceptos y Productos</h3><div className="flex flex-wrap gap-2 w-full md:w-auto items-center"><button onClick={addSectionItem} className="flex-1 md:flex-none text-sm bg-white border border-slate-300 px-3 py-2 rounded-md hover:bg-slate-50 text-slate-700 font-medium shadow-sm">+ Sección</button><div className="w-full md:w-48"><SearchableSelect options={kitOptions} value="" onChange={(val) => { const k = kits.find(kit => kit.id === val); if(k) addKitAsLines(k); }} placeholder="+ Añadir Pack..."/></div><div className="w-full md:w-64"><SearchableSelect options={productOptions} value="" onChange={(val) => { const p = products.find(prod => prod.id === val); if(p) addProductAsLine(p); }} placeholder="+ Añadir Producto..."/></div></div></div>
+          <section className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible relative z-10">
+            <div className="p-4 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 rounded-t-xl"><h3 className="text-lg font-bold text-slate-800">Conceptos y Productos</h3><div className="flex flex-wrap gap-2 w-full md:w-auto items-center"><button onClick={addSectionItem} className="flex-1 md:flex-none text-sm bg-white border border-slate-300 px-3 py-2 rounded-md hover:bg-slate-50 text-slate-700 font-medium shadow-sm">+ Sección</button><div className="w-full md:w-48"><SearchableSelect options={kitOptions} value="" onChange={(val) => { const k = kits.find(kit => kit.id === val); if(k) addKitAsLines(k); }} placeholder="+ Añadir Pack..."/></div><div className="w-full md:w-64"><SearchableSelect options={productOptions} value="" onChange={(val) => { const p = products.find(prod => prod.id === val); if(p) addProductAsLine(p); }} placeholder="+ Añadir Producto..."/></div></div></div>
             <div className="overflow-x-auto w-full">
               <table className="w-full text-sm min-w-[800px]">
                 <thead className="bg-gray-100 text-slate-600 text-xs uppercase font-semibold"><tr><th className="w-12 py-3"></th><th className="px-4 py-3 text-left w-24">Ref</th><th className="px-4 py-3 text-left">Descripción / Producto</th><th className="px-4 py-3 text-right w-24">Uds</th><th className="px-4 py-3 text-right w-32">Precio</th><th className="px-4 py-3 text-right w-24">Dto %</th><th className="px-4 py-3 text-right w-32">Total</th><th className="w-12 py-3"></th></tr></thead>
@@ -333,16 +440,78 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"><h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><PenIcon /> Firma Digital Cliente</h3><SignaturePad initial={budget.clientSignature} onSave={(data) => updateBudget({ clientSignature: data })} onClear={() => updateBudget({ clientSignature: undefined })} /></div>
                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"><h3 className="font-bold text-slate-800 mb-4">Línea de Tiempo (Notas CRM)</h3><div className="space-y-4 mb-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">{(budget.events || []).map(event => (<div key={event.id} className="flex gap-3 text-sm"><div className="mt-1 flex-shrink-0"><div className={`w-2 h-2 rounded-full ${event.type === 'status_change' ? 'bg-orange-500' : 'bg-slate-300'}`}></div></div><div><div className="flex items-center gap-2"><span className="font-bold text-slate-700 text-xs">{event.authorName}</span><span className="text-slate-400 text-[10px]">{new Date(event.timestamp).toLocaleString()}</span></div><p className="text-slate-600">{event.text}</p></div></div>))}</div><div className="flex gap-2"><input className="flex-1 text-sm border border-gray-300 rounded p-2 bg-white text-slate-900" placeholder="Escribe una nota interna..." value={newEventText} onChange={(e) => setNewEventText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addEvent()} /><button onClick={addEvent} className="bg-slate-800 text-white p-2 rounded hover:bg-slate-700"><SendIcon /></button></div></div>
             </div>
-            <div className="bg-slate-50 p-6 rounded-xl border border-gray-200 shadow-sm space-y-4 h-fit">
-              <div className="flex justify-between text-sm text-slate-600"><span>Subtotal (Neto)</span><span className="font-semibold text-slate-800">{subtotal.toFixed(2)} €</span></div>
-              <div className="flex justify-between items-center text-sm"><span className="text-slate-600">Descuento Global (%)</span><div className="flex items-center gap-2"><input type="number" className="w-16 bg-white border border-gray-300 rounded text-right text-sm p-1 text-slate-900" value={budget.discountPercentage} onChange={e => updateBudget({ discountPercentage: parseFloat(e.target.value) })} /><span className="text-red-500 w-20 text-right">-{discountAmount.toFixed(2)} €</span></div></div>
-              <div className="flex justify-between items-center text-sm"><span className="text-green-700 font-medium">Bono / Subvención</span><div className="flex items-center gap-2"><input type="number" className="w-24 border-green-300 rounded text-right text-sm text-green-700 bg-white p-1" value={budget.bonusAmount} onChange={e => updateBudget({ bonusAmount: parseFloat(e.target.value) })} /><span className="text-green-700 w-12 text-right">€</span></div></div>
-              <div className="border-t border-gray-300 my-2"></div>
-              <div className="flex justify-between text-sm"><span className="text-slate-800 font-medium">Base Imponible</span><span className="font-bold">{taxableBase.toFixed(2)} €</span></div>
-              <div className="flex justify-between items-center text-sm"><span className="text-slate-600">IVA</span><div className="flex items-center gap-2"><select className="w-16 bg-white border border-gray-300 rounded text-right text-sm p-1 text-slate-900" value={budget.taxPercentage} onChange={e => updateBudget({ taxPercentage: parseFloat(e.target.value) })}><option value="21">21%</option><option value="10">10%</option><option value="4">4%</option><option value="0">0%</option></select><span className="text-slate-600 w-20 text-right">+{taxAmount.toFixed(2)} €</span></div></div>
-              <div className="flex justify-between items-center text-sm"><span className="text-blue-600 font-medium">Retención IRPF (%)</span><div className="flex items-center gap-2"><input type="number" className="w-16 bg-white border border-blue-200 text-blue-800 rounded text-right text-sm p-1" value={budget.withholdingTax || 0} onChange={e => updateBudget({ withholdingTax: parseFloat(e.target.value) })} /><span className="text-blue-600 w-20 text-right">-{withholdingAmount.toFixed(2)} €</span></div></div>
-              <div className="border-t border-slate-800 my-4"></div>
-              <div className="flex justify-between items-end"><span className="text-xl font-bold text-slate-900">TOTAL</span><span className={`text-3xl font-bold ${isSage ? 'text-[#00d061]' : 'text-red-600'}`}>{total.toFixed(2)} €</span></div>
+            
+            <div className="space-y-4">
+                {/* Financial Totals Panel */}
+                <div className="bg-slate-50 p-6 rounded-xl border border-gray-200 shadow-sm space-y-4 h-fit relative">
+                    <div className="flex justify-between text-sm text-slate-600"><span>Subtotal (Neto)</span><span className="font-semibold text-slate-800">{subtotal.toFixed(2)} €</span></div>
+                    <div className="flex justify-between items-center text-sm"><span className="text-slate-600">Descuento Global (%)</span><div className="flex items-center gap-2"><input type="number" className="w-16 bg-white border border-gray-300 rounded text-right text-sm p-1 text-slate-900" value={budget.discountPercentage} onChange={e => updateBudget({ discountPercentage: parseFloat(e.target.value) })} /><span className="text-red-500 w-20 text-right">-{discountAmount.toFixed(2)} €</span></div></div>
+                    <div className="flex justify-between items-center text-sm"><span className="text-green-700 font-medium">Bono / Subvención</span><div className="flex items-center gap-2"><input type="number" className="w-24 border-green-300 rounded text-right text-sm text-green-700 bg-white p-1" value={budget.bonusAmount} onChange={e => updateBudget({ bonusAmount: parseFloat(e.target.value) })} /><span className="text-green-700 w-12 text-right">€</span></div></div>
+                    <div className="border-t border-gray-300 my-2"></div>
+                    <div className="flex justify-between text-sm"><span className="text-slate-800 font-medium">Base Imponible</span><span className="font-bold">{taxableBase.toFixed(2)} €</span></div>
+                    <div className="flex justify-between items-center text-sm"><span className="text-slate-600">IVA</span><div className="flex items-center gap-2"><select className="w-16 bg-white border border-gray-300 rounded text-right text-sm p-1 text-slate-900" value={budget.taxPercentage} onChange={e => updateBudget({ taxPercentage: parseFloat(e.target.value) })}><option value="21">21%</option><option value="10">10%</option><option value="4">4%</option><option value="0">0%</option></select><span className="text-slate-600 w-20 text-right">+{taxAmount.toFixed(2)} €</span></div></div>
+                    <div className="flex justify-between items-center text-sm"><span className="text-blue-600 font-medium">Retención IRPF (%)</span><div className="flex items-center gap-2"><input type="number" className="w-16 bg-white border border-blue-200 text-blue-800 rounded text-right text-sm p-1" value={budget.withholdingTax || 0} onChange={e => updateBudget({ withholdingTax: parseFloat(e.target.value) })} /><span className="text-blue-600 w-20 text-right">-{withholdingAmount.toFixed(2)} €</span></div></div>
+                    <div className="border-t border-slate-800 my-4"></div>
+                    <div className="flex justify-between items-end"><span className="text-xl font-bold text-slate-900">TOTAL</span><span className={`text-3xl font-bold ${isSage ? 'text-[#00d061]' : 'text-red-600'}`}>{total.toFixed(2)} €</span></div>
+                </div>
+
+                {/* Profitability Widget (NEW) */}
+                <div className="bg-gray-800 text-white p-4 rounded-xl shadow-lg border border-gray-700 relative overflow-hidden">
+                    <div className="flex justify-between items-center mb-3">
+                        <h4 className="font-bold text-sm flex items-center gap-2 text-gray-200"><TrendingUpIcon /> Análisis de Rentabilidad</h4>
+                        <button onClick={() => setShowProfitability(!showProfitability)} className="text-gray-400 hover:text-white transition-colors">{showProfitability ? <EyeIcon /> : <EyeOffIcon />}</button>
+                    </div>
+                    
+                    {showProfitability ? (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                             <div className="flex justify-between text-xs">
+                                 <span className="text-gray-400">Coste Total (Productos)</span>
+                                 <span className="font-mono">{totalCost.toFixed(2)} €</span>
+                             </div>
+                             <div className="flex justify-between text-xs">
+                                 <span className="text-gray-400">Base Imponible</span>
+                                 <span className="font-mono">{taxableBase.toFixed(2)} €</span>
+                             </div>
+                             <div className="h-px bg-gray-600 my-2"></div>
+                             <div className="flex justify-between items-center">
+                                 <span className="text-xs font-bold uppercase text-gray-300">Beneficio Neto</span>
+                                 <span className={`font-mono font-bold text-lg ${netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>{netProfit.toFixed(2)} €</span>
+                             </div>
+                             <div className="bg-gray-900 rounded-lg p-2 flex items-center justify-between border border-gray-700">
+                                 <span className="text-xs font-bold text-gray-400">Margen Comercial</span>
+                                 <span className={`text-sm font-bold px-2 py-0.5 rounded ${marginBg} ${marginColor}`}>
+                                     {marginPercentage.toFixed(2)}%
+                                 </span>
+                             </div>
+                        </div>
+                    ) : (
+                        <div className="text-xs text-gray-500 italic text-center py-2">Información oculta (Solo ojos internos)</div>
+                    )}
+                </div>
+
+                {/* Payment Terms Widget (NEW) */}
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <h4 className="font-bold text-slate-800 mb-3 text-sm flex items-center gap-2"><CalendarIcon /> Vencimientos / Plazos de Pago</h4>
+                    <div className="space-y-2 mb-3">
+                        {(budget.paymentTerms || []).map((term) => (
+                            <div key={term.id} className="flex gap-2 items-center text-xs">
+                                <input className="flex-1 border border-gray-300 rounded p-1.5 bg-white text-slate-800" value={term.concept} onChange={e => updatePaymentTerm(term.id, 'concept', e.target.value)} placeholder="Concepto (ej: Firma)" />
+                                <div className="w-16 relative">
+                                    <input className="w-full border border-gray-300 rounded p-1.5 bg-white text-slate-800 text-right pr-4" type="number" value={term.percentage} onChange={e => updatePaymentTerm(term.id, 'percentage', parseFloat(e.target.value))} />
+                                    <span className="absolute right-1 top-1.5 text-gray-400">%</span>
+                                </div>
+                                <div className="w-20 relative">
+                                    <input className="w-full border border-gray-300 rounded p-1.5 bg-gray-50 text-slate-500 text-right pr-4" type="number" value={term.amount.toFixed(2)} readOnly />
+                                    <span className="absolute right-1 top-1.5 text-gray-400">€</span>
+                                </div>
+                                <input type="date" className="w-24 border border-gray-300 rounded p-1.5 bg-white text-slate-800" value={term.date || ''} onChange={e => updatePaymentTerm(term.id, 'date', e.target.value)} />
+                                <button onClick={() => removePaymentTerm(term.id)} className="text-slate-400 hover:text-red-500"><XIcon /></button>
+                            </div>
+                        ))}
+                        {(budget.paymentTerms || []).length === 0 && <div className="text-xs text-gray-400 italic text-center py-2 bg-gray-50 rounded">Pago único por defecto</div>}
+                    </div>
+                    <button onClick={handleAddPaymentTerm} className="w-full py-1.5 text-xs font-bold text-slate-600 bg-gray-100 hover:bg-gray-200 rounded border border-gray-200 dashed">+ Añadir Plazo</button>
+                </div>
             </div>
           </section>
         </div>

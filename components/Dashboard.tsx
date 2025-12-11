@@ -48,6 +48,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
   const [stats, setStats] = useState({ totalMonth: 0, pending: 0, accepted: 0, recurring: 0 });
   const [chartData, setChartData] = useState<any[]>([]);
   
+  // Right panel tab state
+  const [rightPanelTab, setRightPanelTab] = useState<'tasks' | 'activity'>('tasks');
+
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
   const [filters, setFilters] = useState({
@@ -293,7 +296,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-72">
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[350px]">
                 <h3 className="text-sm font-bold text-slate-600 uppercase mb-4">Evolución de Ventas</h3>
                 <div className="flex-1">
                     <ResponsiveContainer width="100%" height="100%">
@@ -309,58 +312,71 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
               </div>
           </div>
 
-          {/* RIGHT: Tasks & Activity */}
-          <div className="xl:col-span-1 space-y-6">
-              
-              {/* TASKS */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden max-h-[350px]">
-                  <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                      <h3 className="font-bold text-slate-800">Mis Tareas</h3>
-                      <span className="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-1 rounded-full">{tasks.length}</span>
+          {/* RIGHT: Tasks & Activity (TABBED) */}
+          <div className="xl:col-span-1 h-full">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden h-[454px]">
+                  
+                  {/* TABS */}
+                  <div className="flex border-b border-gray-100 bg-gray-50/50 p-1 gap-1">
+                      <button 
+                        onClick={() => setRightPanelTab('tasks')}
+                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${rightPanelTab === 'tasks' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                          Mis Tareas ({tasks.length})
+                      </button>
+                      <button 
+                        onClick={() => setRightPanelTab('activity')}
+                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${rightPanelTab === 'activity' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                          Actividad
+                      </button>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
-                      {tasks.map(task => (
-                          <div key={task.id} className="flex items-start gap-3 p-3 bg-white border border-gray-100 rounded-xl hover:shadow-md transition-shadow group">
-                              <button onClick={() => toggleTask(task)} className="mt-1 w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-green-500 hover:bg-green-50 text-transparent hover:text-green-600 transition-all flex-shrink-0"><CheckIcon /></button>
-                              <div className="flex-1">
-                                  <p className={`text-sm text-slate-800 font-medium ${task.completed ? 'line-through text-slate-400' : ''}`}>{task.title}</p>
-                                  {task.relatedBudgetNumber && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded mt-1 inline-block">{task.relatedBudgetNumber}</span>}
-                                  <div className="text-[10px] text-slate-400 mt-1">{new Date(task.dueDate).toLocaleDateString()}</div>
-                              </div>
-                          </div>
-                      ))}
-                      {tasks.length === 0 && <div className="text-center py-8 text-slate-400 italic text-sm">¡Todo al día!</div>}
-                  </div>
-                  <div className="p-4 border-t border-gray-100 bg-gray-50">
-                      <form onSubmit={handleAddTask} className="flex gap-2">
-                          <input className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-800 outline-none bg-white text-slate-900" placeholder="Nueva tarea..." value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} />
-                          <button type="submit" className="bg-slate-800 text-white p-2 rounded-lg hover:bg-slate-700"><PlusIcon /></button>
-                      </form>
-                  </div>
-              </div>
 
-              {/* RECENT ACTIVITY */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden max-h-[350px]">
-                  <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
-                      <ActivityIcon />
-                      <h3 className="font-bold text-slate-800">Última Actividad</h3>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-0 custom-scrollbar">
-                      {logs.map((log, i) => (
-                          <div key={log.id} className={`p-3 text-xs border-b border-gray-50 flex gap-3 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold flex-shrink-0">
-                                  {getInitials(log.userName)}
-                              </div>
-                              <div className="flex-1">
-                                  <div className="font-bold text-slate-700">{log.action.replace(/_/g, ' ')}</div>
-                                  <div className="text-slate-500 truncate w-48" title={log.details}>{log.details}</div>
-                                  <div className="text-[10px] text-slate-400 mt-1">{new Date(log.timestamp).toLocaleTimeString()}</div>
-                              </div>
+                  {/* CONTENT */}
+                  <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-white">
+                      
+                      {rightPanelTab === 'tasks' ? (
+                          <div className="space-y-2">
+                              {tasks.map(task => (
+                                  <div key={task.id} className="flex items-start gap-3 p-3 bg-white border border-gray-100 rounded-xl hover:shadow-md transition-shadow group">
+                                      <button onClick={() => toggleTask(task)} className="mt-1 w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-green-500 hover:bg-green-50 text-transparent hover:text-green-600 transition-all flex-shrink-0"><CheckIcon /></button>
+                                      <div className="flex-1">
+                                          <p className={`text-sm text-slate-800 font-medium ${task.completed ? 'line-through text-slate-400' : ''}`}>{task.title}</p>
+                                          {task.relatedBudgetNumber && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded mt-1 inline-block">{task.relatedBudgetNumber}</span>}
+                                          <div className="text-[10px] text-slate-400 mt-1">{new Date(task.dueDate).toLocaleDateString()}</div>
+                                      </div>
+                                  </div>
+                              ))}
+                              {tasks.length === 0 && <div className="text-center py-12 text-slate-400 italic text-sm">¡Todo al día!</div>}
                           </div>
-                      ))}
+                      ) : (
+                          <div className="space-y-0">
+                              {logs.map((log, i) => (
+                                  <div key={log.id} className={`p-3 text-xs border-b border-gray-50 flex gap-3 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
+                                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold flex-shrink-0">
+                                          {getInitials(log.userName)}
+                                      </div>
+                                      <div className="flex-1">
+                                          <div className="font-bold text-slate-700">{log.action.replace(/_/g, ' ')}</div>
+                                          <div className="text-slate-500 truncate w-40" title={log.details}>{log.details}</div>
+                                          <div className="text-[10px] text-slate-400 mt-1">{new Date(log.timestamp).toLocaleTimeString()}</div>
+                                      </div>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
                   </div>
-              </div>
 
+                  {/* BOTTOM INPUT (Only for tasks) */}
+                  {rightPanelTab === 'tasks' && (
+                      <div className="p-3 border-t border-gray-100 bg-gray-50">
+                          <form onSubmit={handleAddTask} className="flex gap-2">
+                              <input className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-800 outline-none bg-white text-slate-900" placeholder="Nueva tarea..." value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} />
+                              <button type="submit" className="bg-slate-800 text-white p-2 rounded-lg hover:bg-slate-700"><PlusIcon /></button>
+                          </form>
+                      </div>
+                  )}
+              </div>
           </div>
       </div>
 

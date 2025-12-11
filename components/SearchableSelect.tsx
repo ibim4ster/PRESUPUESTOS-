@@ -54,12 +54,12 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({ options, val
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
-          <div className="sticky top-0 bg-white p-2 border-b border-gray-100">
+        <div className="absolute z-50 mt-1 min-w-full w-max max-w-[90vw] md:max-w-xl bg-white shadow-xl max-h-80 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+          <div className="sticky top-0 bg-white p-2 border-b border-gray-100 z-10">
              <input 
                 type="text"
                 autoFocus
-                className="w-full bg-white text-slate-900 border border-gray-300 rounded p-1.5 text-sm focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 placeholder-slate-400"
+                className="w-full bg-white text-slate-900 border border-gray-300 rounded p-2 text-sm focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 placeholder-slate-400"
                 placeholder="Buscar..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -67,23 +67,23 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({ options, val
              />
           </div>
           {filteredOptions.length === 0 ? (
-             <div className="text-slate-500 cursor-default select-none relative py-2 px-4 italic bg-white">No hay resultados</div>
+             <div className="text-slate-500 cursor-default select-none relative py-3 px-4 italic bg-white text-center text-sm">No hay resultados</div>
           ) : (
              filteredOptions.map((option) => (
                <div
                  key={option.value}
-                 className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-slate-50 text-slate-900 bg-white border-b border-gray-50 last:border-0"
+                 className="cursor-pointer relative py-2 pl-3 pr-4 hover:bg-slate-50 text-slate-900 bg-white border-b border-gray-50 last:border-0 transition-colors"
                  onClick={() => {
                    onChange(option.value);
                    setIsOpen(false);
                    setSearchTerm('');
                  }}
                >
-                 <div className="flex items-center">
-                    {option.image && <img src={option.image} alt="" className="h-6 w-6 rounded-full mr-2 object-cover border border-gray-200" />}
-                    <div className="flex flex-col">
-                        <span className="block truncate font-medium">{option.label}</span>
-                        {option.subLabel && <span className="text-xs text-slate-400 truncate hidden sm:block">{option.subLabel}</span>}
+                 <div className="flex items-start">
+                    {option.image && <img src={option.image} alt="" className="h-8 w-8 rounded mr-3 object-cover border border-gray-200 mt-1 flex-shrink-0" />}
+                    <div className="flex flex-col min-w-0">
+                        <span className="font-medium text-sm text-slate-800 whitespace-normal break-words">{option.label}</span>
+                        {option.subLabel && <span className="text-xs text-slate-500 whitespace-normal break-words mt-0.5">{option.subLabel}</span>}
                     </div>
                  </div>
                </div>

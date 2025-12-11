@@ -1,5 +1,4 @@
 
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Budget, CompanyProfile, PdfConfig, DEFAULT_LEGAL_TEXTS } from '../types';
@@ -266,8 +265,37 @@ export const generateBudgetPdf = (
   finalY += 2;
   drawTotalLine("TOTAL", `${total.toFixed(2)} €`, true, [255, 255, 255], primaryRgb);
 
+  // --- NEW: Payment Terms Table ---
+  if (budget.paymentTerms && budget.paymentTerms.length > 0) {
+      if (finalY > pageHeight - 40) { doc.addPage(); finalY = 20; } else { finalY += 10; }
+      
+      doc.setFontSize(9);
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+      doc.setFont('helvetica', 'bold');
+      doc.text("FORMA DE PAGO / VENCIMIENTOS", 15, finalY);
+      finalY += 2;
+
+      autoTable(doc, {
+          startY: finalY,
+          head: [['Concepto / Hito', 'Fecha', '%', 'Importe']],
+          body: budget.paymentTerms.map(t => [
+              t.concept,
+              t.date ? new Date(t.date).toLocaleDateString() : 'A concretar',
+              `${t.percentage}%`,
+              `${t.amount.toFixed(2)} €`
+          ]),
+          theme: 'grid',
+          headStyles: { fillColor: [240, 240, 240], textColor: 50, fontStyle: 'bold', lineWidth: 0 },
+          styles: { fontSize: 8, cellPadding: 2, textColor: 80 },
+          columnStyles: { 3: { halign: 'right', fontStyle: 'bold' } }
+      });
+      finalY = (doc as any).lastAutoTable.finalY + 10;
+  } else {
+      finalY += 10;
+  }
+
   if (config.showLegal) {
-      if (finalY > pageHeight - 80) { doc.addPage(); finalY = 20; } else { finalY += 10; }
+      if (finalY > pageHeight - 80) { doc.addPage(); finalY = 20; }
       doc.setFontSize(8); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]); doc.setFont('helvetica', 'bold'); doc.text("TÉRMINOS Y CONDICIONES", 15, finalY);
       finalY += 5;
       doc.setTextColor(80); doc.setFont('helvetica', 'normal'); doc.setFontSize(7);

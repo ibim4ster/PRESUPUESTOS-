@@ -1,5 +1,4 @@
 
-
 export type SystemType = 'agora' | 'sage' | 'sage200' | 'sagedespachos';
 
 export type UserRole = 'admin' | 'commercial';
@@ -83,6 +82,7 @@ export interface LineItem {
   description: string; 
   units: number; 
   price: number; 
+  costPrice?: number; // Added for Profitability Analysis
   discount?: number; 
   image?: string;
   isRecurring?: boolean; 
@@ -94,6 +94,14 @@ export interface BudgetEvent {
     authorName: string;
     text: string;
     type: 'note' | 'status_change' | 'creation';
+}
+
+export interface PaymentTerm {
+    id: string;
+    concept: string; // e.g., "A la firma", "A la entrega"
+    percentage: number;
+    amount: number;
+    date?: string;
 }
 
 export interface Budget {
@@ -118,6 +126,9 @@ export interface Budget {
   taxPercentage: number;
   withholdingTax?: number; 
   
+  // New Payment Features
+  paymentTerms?: PaymentTerm[];
+
   clientSignature?: string; 
   internalNotes?: string; 
   events?: BudgetEvent[]; 
