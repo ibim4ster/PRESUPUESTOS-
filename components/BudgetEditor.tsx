@@ -4,6 +4,7 @@ import { storageService } from '../services/storage';
 import { generateBudgetPdf } from '../services/pdfGenerator';
 import { Budget, Client, LineItem, Product, PdfConfig, SystemType, ProductKit, User, BudgetEvent, PaymentTerm } from '../types';
 import { SearchableSelect } from './SearchableSelect';
+import { GoogleGenAI } from "@google/genai";
 
 interface BudgetEditorProps {
   initialBudget?: Budget | null;
@@ -28,9 +29,10 @@ const SendIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height
 const RefreshIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>;
 const GitBranchIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>;
 const TrendingUpIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>;
-const PieChartIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>;
 const EyeOffIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07-2.3 2.3"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
 const CalendarIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
+const MessageSquareIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
+const MagicWandIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 2 2 2-2 2-2-2 2-2Z"/><path d="m5 6 4 4-4 4-4-4 4-4Z"/><path d="m15 13 2 2-2 2-2-2 2-2Z"/><path d="M2 21h4.6L22 5.6 18.4 2 2.9 17.5V21Z"/></svg>;
 
 const SignaturePad = ({ onSave, onClear, initial }: { onSave: (data: string) => void, onClear: () => void, initial?: string }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -86,7 +88,7 @@ const SignaturePad = ({ onSave, onClear, initial }: { onSave: (data: string) => 
 };
 
 // VISUAL STATUS STEPPER COMPONENT
-const StatusStepper = ({ status, onChange }: { status: string, onChange: (s: any) => void }) => {
+const StatusStepper = ({ status, onChange, rejectionReason }: { status: string, onChange: (s: any) => void, rejectionReason?: string }) => {
     const steps = [
         { id: 'draft', label: 'Borrador', color: 'bg-gray-200 text-gray-600' },
         { id: 'pending', label: 'Pendiente', color: 'bg-orange-100 text-orange-600' },
@@ -97,28 +99,35 @@ const StatusStepper = ({ status, onChange }: { status: string, onChange: (s: any
     const currentIndex = steps.findIndex(s => s.id === status);
 
     return (
-        <div className="flex items-center gap-2 mb-4 w-full overflow-x-auto pb-2">
-            {steps.map((step, idx) => {
-                const isActive = step.id === status;
-                const isPast = idx < currentIndex;
-                
-                return (
-                    <div key={step.id} className="flex items-center cursor-pointer" onClick={() => onChange(step.id)}>
-                        <div className={`
-                            px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-2
-                            ${isActive ? `${step.color} ring-2 ring-offset-1 ring-slate-200 scale-105 shadow-sm` : isPast ? 'bg-slate-100 text-slate-400' : 'bg-white border border-gray-200 text-gray-400 hover:bg-gray-50'}
-                        `}>
-                            {isActive && <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></div>}
-                            {step.label}
-                        </div>
-                        {idx < steps.length - 1 && (
-                            <div className="w-6 h-0.5 mx-2 bg-gray-100">
-                                <div className={`h-full bg-slate-300 transition-all ${isPast ? 'w-full' : 'w-0'}`}></div>
+        <div className="w-full mb-4">
+            <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                {steps.map((step, idx) => {
+                    const isActive = step.id === status;
+                    const isPast = idx < currentIndex;
+                    
+                    return (
+                        <div key={step.id} className="flex items-center cursor-pointer" onClick={() => onChange(step.id)}>
+                            <div className={`
+                                px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-2
+                                ${isActive ? `${step.color} ring-2 ring-offset-1 ring-slate-200 scale-105 shadow-sm` : isPast ? 'bg-slate-100 text-slate-400' : 'bg-white border border-gray-200 text-gray-400 hover:bg-gray-50'}
+                            `}>
+                                {isActive && <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></div>}
+                                {step.label}
                             </div>
-                        )}
-                    </div>
-                )
-            })}
+                            {idx < steps.length - 1 && (
+                                <div className="w-6 h-0.5 mx-2 bg-gray-100">
+                                    <div className={`h-full bg-slate-300 transition-all ${isPast ? 'w-full' : 'w-0'}`}></div>
+                                </div>
+                            )}
+                        </div>
+                    )
+                })}
+            </div>
+            {status === 'rejected' && rejectionReason && (
+                <div className="bg-red-50 text-red-800 text-xs p-2 rounded border border-red-100 inline-block mt-1 animate-in fade-in slide-in-from-top-1">
+                    <strong>Motivo:</strong> {rejectionReason}
+                </div>
+            )}
         </div>
     );
 };
@@ -135,6 +144,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
       id: crypto.randomUUID(), number: nextNumber, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       status: 'draft', clientId: '', clientData: { id: '', commercialName: '', legalName: '', cif: '', address: '', email: '', phone: '', paymentMethod: '' },
       validityDays: 15, lineItems: [], discountPercentage: 0, bonusAmount: 0, taxPercentage: 21, withholdingTax: 0, clientSignature: '', system: currentSystem, internalNotes: '', createdBy: currentUser.id, creatorName: currentUser.name,
+      presentationText: '', // NEW
       events: [{ id: crypto.randomUUID(), timestamp: new Date().toISOString(), authorName: currentUser.name, text: 'Presupuesto creado', type: 'creation' }]
     };
   });
@@ -151,6 +161,13 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
   
   // Profitability Widget State
   const [showProfitability, setShowProfitability] = useState(false);
+
+  // Rejection Reason Modal
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [pendingRejection, setPendingRejection] = useState<string | null>(null);
+
+  // AI State
+  const [isAiLoading, setIsAiLoading] = useState<string | null>(null); // holds the item ID being processed
 
   // --- KEYBOARD SHORTCUTS ---
   useEffect(() => {
@@ -187,6 +204,19 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
       setIsSaved(true);
   };
 
+  const handleStatusChange = (newStatus: any) => {
+      if (newStatus === 'rejected') {
+          setShowRejectionModal(true);
+      } else {
+          updateBudget({ status: newStatus });
+      }
+  };
+
+  const confirmRejection = (reason: string) => {
+      updateBudget({ status: 'rejected', rejectionReason: reason });
+      setShowRejectionModal(false);
+  };
+
   const updateBudget = (updates: Partial<Budget>) => {
     if (updates.status && updates.status !== budget.status) {
         const event: BudgetEvent = { id: crypto.randomUUID(), timestamp: new Date().toISOString(), authorName: currentUser.name, text: `Estado cambiado de ${budget.status} a ${updates.status}`, type: 'status_change' };
@@ -195,6 +225,38 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
         setBudget(prev => ({ ...prev, ...updates, updatedAt: new Date().toISOString() }));
     }
     setIsSaved(false);
+  };
+
+  // --- AI INTEGRATION ---
+  const handleAiImprove = async (itemId: string, currentText: string) => {
+      if (!process.env.API_KEY) {
+          onShowToast("Falta API Key de Gemini", "error");
+          // Fallback simulation for demo
+          const simulatedImprovement = "Instalación y configuración profesional avanzada de " + currentText + " con garantía de servicio premium.";
+          updateLineItem(itemId, { description: simulatedImprovement });
+          return;
+      }
+
+      setIsAiLoading(itemId);
+      try {
+          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+          const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
+          const prompt = `Act as a professional sales copywriter. Rewrite the following product description to be more persuasive, professional, and concise for a formal business quote (Spanish): "${currentText}". Return ONLY the text, no quotes or explanations.`;
+          
+          const result = await model.generateContent(prompt);
+          const response = await result.response;
+          const text = response.text();
+          
+          if (text) {
+              updateLineItem(itemId, { description: text.trim() });
+              onShowToast("Descripción mejorada con IA", "success");
+          }
+      } catch (error) {
+          console.error("AI Error", error);
+          onShowToast("Error al conectar con Gemini", "error");
+      } finally {
+          setIsAiLoading(null);
+      }
   };
 
   const addEvent = () => {
@@ -230,7 +292,11 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
 
   const handleClientSelect = (clientId: string) => {
     const client = clients.find(c => c.id === clientId);
-    if (client) { updateBudget({ clientId: client.id, clientData: { ...client } }); }
+    if (client) { 
+        // Auto-fill presentation text if empty
+        const defaultText = budget.presentationText || `Estimado/a ${client.commercialName},\n\nGracias por su interés en nuestras soluciones. Adjunto encontrará el detalle de nuestra propuesta valorada.\n\nQuedamos a su disposición para cualquier consulta.\n\nAtentamente,`;
+        updateBudget({ clientId: client.id, clientData: { ...client }, presentationText: defaultText }); 
+    }
   };
 
   const addLineItem = () => { }; 
@@ -379,7 +445,11 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
         <div className="p-4 md:p-8 space-y-8 max-w-5xl mx-auto w-full">
           
           {/* Status Pipeline Visualizer */}
-          <StatusStepper status={budget.status} onChange={(s) => updateBudget({ status: s })} />
+          <StatusStepper 
+            status={budget.status} 
+            onChange={handleStatusChange} 
+            rejectionReason={budget.rejectionReason}
+          />
 
           <section className="grid grid-cols-1 md:grid-cols-12 gap-6">
             <div className="md:col-span-7 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
@@ -408,6 +478,19 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
             </div>
           </section>
 
+          {/* Presentation Text Area */}
+          <section className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+              <h3 className="text-sm font-bold text-slate-800 mb-2 flex items-center gap-2">
+                  <MessageSquareIcon /> Carta de Presentación / Introducción
+              </h3>
+              <textarea 
+                  className="w-full border border-gray-300 rounded-lg p-3 text-sm bg-white text-slate-800 h-24 focus:ring-2 focus:ring-slate-800 outline-none resize-none"
+                  placeholder="Escriba aquí una introducción personalizada para el cliente que aparecerá al inicio del PDF..."
+                  value={budget.presentationText || ''}
+                  onChange={e => updateBudget({ presentationText: e.target.value })}
+              />
+          </section>
+
           <section className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible relative z-10">
             <div className="p-4 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 rounded-t-xl"><h3 className="text-lg font-bold text-slate-800">Conceptos y Productos</h3><div className="flex flex-wrap gap-2 w-full md:w-auto items-center"><button onClick={addSectionItem} className="flex-1 md:flex-none text-sm bg-white border border-slate-300 px-3 py-2 rounded-md hover:bg-slate-50 text-slate-700 font-medium shadow-sm">+ Sección</button><div className="w-full md:w-48"><SearchableSelect options={kitOptions} value="" onChange={(val) => { const k = kits.find(kit => kit.id === val); if(k) addKitAsLines(k); }} placeholder="+ Añadir Pack..."/></div><div className="w-full md:w-64"><SearchableSelect options={productOptions} value="" onChange={(val) => { const p = products.find(prod => prod.id === val); if(p) addProductAsLine(p); }} placeholder="+ Añadir Producto..."/></div></div></div>
             <div className="overflow-x-auto w-full">
@@ -421,7 +504,23 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
                       <tr key={item.id} className="group hover:bg-gray-50/80">
                         <td className="p-2 text-center"><div className="flex flex-col text-slate-300 group-hover:text-slate-400"><button onClick={() => moveLineItem(index, 'up')} className="hover:text-slate-800 p-1"><ArrowUpIcon/></button><button onClick={() => moveLineItem(index, 'down')} className="hover:text-slate-800 p-1"><ArrowDownIcon/></button></div></td>
                         <td className="p-2"><input className="w-full text-xs text-slate-700 bg-white border border-gray-200 rounded px-2 py-2" value={item.reference} onChange={e => updateLineItem(item.id, { reference: e.target.value })} placeholder="REF" /></td>
-                        <td className="p-2"><div className="flex items-center gap-3">{item.image ? (<img src={item.image} className="w-10 h-10 object-cover rounded border border-gray-200 bg-white" />) : (<div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex items-center justify-center text-slate-300 text-xs flex-shrink-0">IMG</div>)}<div className="flex-1"><textarea className="w-full text-slate-800 bg-white border border-gray-200 rounded px-2 py-2 resize-none h-auto min-h-[40px]" value={item.description} onChange={e => updateLineItem(item.id, { description: e.target.value })} rows={1} placeholder="Descripción del producto" />{item.isRecurring && <span className="text-[10px] text-purple-600 bg-purple-50 px-1 rounded font-bold flex items-center gap-1 w-fit mt-1"><RefreshIcon/> Recurrente (Anual)</span>}</div></div></td>
+                        <td className="p-2">
+                            <div className="flex items-start gap-3">
+                                {item.image ? (<img src={item.image} className="w-10 h-10 object-cover rounded border border-gray-200 bg-white mt-1" />) : (<div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex items-center justify-center text-slate-300 text-xs flex-shrink-0 mt-1">IMG</div>)}
+                                <div className="flex-1 relative">
+                                    <textarea className="w-full text-slate-800 bg-white border border-gray-200 rounded px-2 py-2 resize-none h-auto min-h-[40px] pr-8" value={item.description} onChange={e => updateLineItem(item.id, { description: e.target.value })} rows={2} placeholder="Descripción del producto" />
+                                    <button 
+                                        onClick={() => handleAiImprove(item.id, item.description)}
+                                        className={`absolute right-2 top-2 p-1 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors ${isAiLoading === item.id ? 'animate-spin' : ''}`}
+                                        title="Mejorar con IA (Magic Rewrite)"
+                                        disabled={isAiLoading !== null}
+                                    >
+                                        <MagicWandIcon />
+                                    </button>
+                                    {item.isRecurring && <span className="text-[10px] text-purple-600 bg-purple-50 px-1 rounded font-bold flex items-center gap-1 w-fit mt-1"><RefreshIcon/> Recurrente (Anual)</span>}
+                                </div>
+                            </div>
+                        </td>
                         <td className="p-2"><input type="number" className="w-full text-right bg-white border border-gray-200 rounded text-slate-900 p-2" value={item.units} onChange={e => updateLineItem(item.id, { units: parseFloat(e.target.value) })} /></td>
                         <td className="p-2"><input type="number" className="w-full text-right bg-white border border-gray-200 rounded text-slate-900 p-2" value={item.price} onChange={e => updateLineItem(item.id, { price: parseFloat(e.target.value) })} /></td>
                         <td className="p-2"><input type="number" min="0" max="100" className="w-full text-right bg-white border border-gray-200 rounded text-slate-900 p-2" value={item.discount || 0} onChange={e => updateLineItem(item.id, { discount: parseFloat(e.target.value) })} /></td>
@@ -516,6 +615,37 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
           </section>
         </div>
       </div>
+      
+      {/* Rejection Reason Modal */}
+      {showRejectionModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 animate-in zoom-in-95 duration-200">
+                  <h3 className="text-lg font-bold text-slate-900 mb-4">¿Por qué se ha perdido esta venta?</h3>
+                  <div className="space-y-2 mb-4">
+                      {['Precio demasiado alto', 'Competencia (Otra solución)', 'Proyecto cancelado / Pospuesto', 'Falta de funcionalidades', 'Mala reputación / Confianza', 'Otro'].map(reason => (
+                          <button 
+                            key={reason}
+                            onClick={() => setPendingRejection(reason)}
+                            className={`w-full text-left px-4 py-2 rounded-lg text-sm border transition-all ${pendingRejection === reason ? 'bg-red-50 border-red-500 text-red-700 font-bold' : 'bg-white border-gray-200 hover:bg-gray-50 text-slate-700'}`}
+                          >
+                              {reason}
+                          </button>
+                      ))}
+                  </div>
+                  <div className="flex justify-end gap-2">
+                      <button onClick={() => setShowRejectionModal(false)} className="px-4 py-2 text-slate-500 hover:text-slate-700 font-medium text-sm">Cancelar</button>
+                      <button 
+                        disabled={!pendingRejection}
+                        onClick={() => pendingRejection && confirmRejection(pendingRejection)} 
+                        className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                          Confirmar Rechazo
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {showPreviewModal && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm"><div className="bg-white w-full max-w-5xl h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200"><div className="flex items-center justify-between p-4 border-b border-gray-100 bg-white z-10"><h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><EyeIcon /> Vista Previa</h3><div className="flex gap-2"><button onClick={handleGeneratePDF} className={`${saveBtnColor} px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2`}><DownloadIcon /> Descargar PDF</button><button onClick={closePreview} className="bg-gray-100 text-slate-600 px-3 py-2 rounded-lg hover:bg-gray-200"><XIcon /></button></div></div><div className="flex-1 bg-slate-100 relative">{previewUrl ? (<iframe src={previewUrl} className="w-full h-full border-0" title="PDF Preview" />) : (<div className="flex items-center justify-center h-full text-slate-400">Cargando vista previa...</div>)}</div></div></div>)}
     </>
   );

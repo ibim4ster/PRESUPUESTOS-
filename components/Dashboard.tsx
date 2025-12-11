@@ -24,6 +24,8 @@ const DownloadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" he
 const CheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
 const TrophyIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>;
 const ActivityIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>;
+const FilterIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>;
+const RefreshIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>;
 
 // Helper for Initials
 const getInitials = (name: string) => {
@@ -48,10 +50,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
   const [stats, setStats] = useState({ totalMonth: 0, pending: 0, accepted: 0, recurring: 0 });
   const [chartData, setChartData] = useState<any[]>([]);
   
+  // Analytics State
+  const [topProducts, setTopProducts] = useState<{name: string, count: number, revenue: number}[]>([]);
+  const [topClients, setTopClients] = useState<{name: string, revenue: number, count: number}[]>([]);
+
   // Right panel tab state
   const [rightPanelTab, setRightPanelTab] = useState<'tasks' | 'activity'>('tasks');
 
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [showFilters, setShowFilters] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
   const [filters, setFilters] = useState({
       global: '', number: '', client: '', dateStart: '', dateEnd: '', minAmount: '', maxAmount: '', status: 'all', commercial: ''
@@ -100,6 +107,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
       recurring: recurringTotal
     });
 
+    // Chart Data
     const months = [];
     for (let i = 5; i >= 0; i--) {
         const d = new Date();
@@ -112,6 +120,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
         months.push({ name: monthKey, total: total });
     }
     setChartData(months);
+
+    // --- ADVANCED ANALYTICS (Accepted Budgets Only) ---
+    const acceptedBudgets = allBudgets.filter(b => b.status === 'accepted');
+    
+    // Top Products
+    const prodMap: Record<string, {name: string, count: number, revenue: number}> = {};
+    acceptedBudgets.forEach(b => {
+        b.lineItems.forEach(item => {
+            if(item.type === 'product') {
+                const key = item.reference || item.description;
+                if(!prodMap[key]) prodMap[key] = { name: key, count: 0, revenue: 0 };
+                prodMap[key].count += item.units;
+                prodMap[key].revenue += (item.units * item.price * (1 - (item.discount||0)/100));
+            }
+        });
+    });
+    const sortedProds = Object.values(prodMap).sort((a,b) => b.revenue - a.revenue).slice(0, 5);
+    setTopProducts(sortedProds);
+
+    // Top Clients
+    const clientMap: Record<string, {name: string, revenue: number, count: number}> = {};
+    acceptedBudgets.forEach(b => {
+        const key = b.clientId;
+        if(!clientMap[key]) clientMap[key] = { name: b.clientData.commercialName, revenue: 0, count: 0 };
+        clientMap[key].revenue += calculateTotal(b);
+        clientMap[key].count += 1;
+    });
+    const sortedClients = Object.values(clientMap).sort((a,b) => b.revenue - a.revenue).slice(0, 5);
+    setTopClients(sortedClients);
   }
 
   const monthlyGoal = currentUser?.monthlyGoal || 0;
@@ -172,16 +209,50 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
       setSortConfig({ key, direction });
   };
 
+  const clearFilters = () => {
+      setFilters({ global: '', number: '', client: '', dateStart: '', dateEnd: '', minAmount: '', maxAmount: '', status: 'all', commercial: '' });
+  };
+
   const processedBudgets = useMemo(() => {
       let result = [...budgets];
       result = result.filter(b => {
-          if (filters.global && !JSON.stringify(b).toLowerCase().includes(filters.global.toLowerCase())) return false;
+          // Global Search
+          if (filters.global) {
+             const searchStr = filters.global.toLowerCase();
+             const matchesGlobal = 
+                b.number.toLowerCase().includes(searchStr) ||
+                b.clientData.commercialName.toLowerCase().includes(searchStr) ||
+                (b.creatorName || '').toLowerCase().includes(searchStr) ||
+                calculateTotal(b).toString().includes(searchStr);
+             if(!matchesGlobal) return false;
+          }
+
+          // Specific Filters
           if (filters.number && !b.number.toLowerCase().includes(filters.number.toLowerCase())) return false;
           if (filters.client && !b.clientData.commercialName.toLowerCase().includes(filters.client.toLowerCase())) return false;
-          if (viewMode === 'list' && filters.status !== 'all' && b.status !== filters.status) return false;
+          if (filters.status !== 'all' && b.status !== filters.status) return false;
           if (filters.commercial && !(b.creatorName || '').toLowerCase().includes(filters.commercial.toLowerCase())) return false;
+          
+          if (filters.dateStart) {
+              const d = new Date(b.createdAt);
+              const start = new Date(filters.dateStart);
+              start.setHours(0,0,0,0);
+              if (d < start) return false;
+          }
+          if (filters.dateEnd) {
+              const d = new Date(b.createdAt);
+              const end = new Date(filters.dateEnd);
+              end.setHours(23,59,59,999);
+              if (d > end) return false;
+          }
+          
+          const total = calculateTotal(b);
+          if (filters.minAmount && total < parseFloat(filters.minAmount)) return false;
+          if (filters.maxAmount && total > parseFloat(filters.maxAmount)) return false;
+
           return true;
       });
+      
       if (sortConfig) {
           result.sort((a, b) => {
               let valA: any = a[sortConfig.key as keyof Budget] || '';
@@ -296,6 +367,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
                 </div>
               </div>
 
+              {/* SALES CHART */}
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[350px]">
                 <h3 className="text-sm font-bold text-slate-600 uppercase mb-4">Evolución de Ventas</h3>
                 <div className="flex-1">
@@ -310,11 +382,60 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
                     </ResponsiveContainer>
                 </div>
               </div>
+
+              {/* NEW: ANALYTICS WIDGETS (TOP SALES) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Top Products */}
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                      <h3 className="text-sm font-bold text-slate-800 uppercase mb-4 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                          Top Productos
+                      </h3>
+                      <div className="space-y-3">
+                          {topProducts.map((p, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-sm border-b border-gray-50 pb-2 last:border-0">
+                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                      <span className="font-mono text-xs text-slate-400 font-bold w-4">{idx + 1}</span>
+                                      <div className="truncate font-medium text-slate-700" title={p.name}>{p.name}</div>
+                                  </div>
+                                  <div className="text-right pl-2">
+                                      <div className="font-bold text-slate-900">{p.revenue.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}</div>
+                                      <div className="text-[10px] text-slate-400">{p.count} uds</div>
+                                  </div>
+                              </div>
+                          ))}
+                          {topProducts.length === 0 && <div className="text-xs text-slate-400 italic">Sin datos suficientes</div>}
+                      </div>
+                  </div>
+
+                  {/* Top Clients */}
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                      <h3 className="text-sm font-bold text-slate-800 uppercase mb-4 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                          Mejores Clientes
+                      </h3>
+                      <div className="space-y-3">
+                          {topClients.map((c, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-sm border-b border-gray-50 pb-2 last:border-0">
+                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                      <span className="font-mono text-xs text-slate-400 font-bold w-4">{idx + 1}</span>
+                                      <div className="truncate font-medium text-slate-700" title={c.name}>{c.name}</div>
+                                  </div>
+                                  <div className="text-right pl-2">
+                                      <div className="font-bold text-slate-900">{c.revenue.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}</div>
+                                      <div className="text-[10px] text-slate-400">{c.count} pedidos</div>
+                                  </div>
+                              </div>
+                          ))}
+                          {topClients.length === 0 && <div className="text-xs text-slate-400 italic">Sin datos suficientes</div>}
+                      </div>
+                  </div>
+              </div>
           </div>
 
           {/* RIGHT: Tasks & Activity (TABBED) */}
           <div className="xl:col-span-1 h-full">
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden h-[454px]">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden h-[454px] xl:h-full sticky top-4">
                   
                   {/* TABS */}
                   <div className="flex border-b border-gray-100 bg-gray-50/50 p-1 gap-1">
@@ -393,11 +514,69 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
                   <button onClick={() => setViewMode('kanban')} className={`p-1.5 rounded-md ${viewMode === 'kanban' ? 'bg-white shadow' : 'text-slate-400'}`}><LayoutKanbanIcon /></button>
               </div>
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-wrap md:flex-nowrap">
+              <button 
+                onClick={() => setShowFilters(!showFilters)} 
+                className={`p-2 rounded-lg border flex items-center gap-2 text-sm font-bold transition-all ${showFilters ? 'bg-slate-800 text-white border-slate-800' : 'bg-white border-gray-200 text-slate-600 hover:bg-gray-50'}`}
+                title="Mostrar/Ocultar Filtros Avanzados"
+              >
+                  <FilterIcon/> <span className="hidden sm:inline">Filtros</span>
+              </button>
               <button onClick={handleExportCSV} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold border border-green-200 bg-green-50 text-green-700 hover:bg-green-100"><DownloadIcon /> CSV</button>
-              <div className="relative"><input className="pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-800" placeholder="Buscar..." value={filters.global} onChange={e => setFilters({...filters, global: e.target.value})} /><div className="absolute left-3 top-2.5 text-slate-400"><SearchIcon /></div></div>
+              <div className="relative"><input className="pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-800" placeholder="Búsqueda rápida..." value={filters.global} onChange={e => setFilters({...filters, global: e.target.value})} /><div className="absolute left-3 top-2.5 text-slate-400"><SearchIcon /></div></div>
           </div>
         </div>
+
+        {/* ADVANCED FILTER PANEL */}
+        {showFilters && (
+            <div className="bg-slate-50 border-b border-gray-200 p-4 animate-in slide-in-from-top-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">Nº Presupuesto</label>
+                        <input className="w-full bg-white border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-slate-800 outline-none" placeholder="Ej: PRE-2024-001" value={filters.number} onChange={e => setFilters({...filters, number: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">Cliente</label>
+                        <input className="w-full bg-white border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-slate-800 outline-none" placeholder="Nombre comercial..." value={filters.client} onChange={e => setFilters({...filters, client: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">Estado</label>
+                        <select className="w-full bg-white border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-slate-800 outline-none cursor-pointer" value={filters.status} onChange={e => setFilters({...filters, status: e.target.value})}>
+                            <option value="all">Todos los Estados</option>
+                            <option value="draft">Borrador</option>
+                            <option value="pending">Pendiente</option>
+                            <option value="accepted">Aceptado</option>
+                            <option value="rejected">Rechazado</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">Comercial</label>
+                        <input className="w-full bg-white border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-slate-800 outline-none" placeholder="Nombre..." value={filters.commercial} onChange={e => setFilters({...filters, commercial: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">Desde Fecha</label>
+                        <input type="date" className="w-full bg-white border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-slate-800 outline-none" value={filters.dateStart} onChange={e => setFilters({...filters, dateStart: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">Hasta Fecha</label>
+                        <input type="date" className="w-full bg-white border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-slate-800 outline-none" value={filters.dateEnd} onChange={e => setFilters({...filters, dateEnd: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">Importe Mín (€)</label>
+                        <input type="number" className="w-full bg-white border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-slate-800 outline-none" placeholder="0" value={filters.minAmount} onChange={e => setFilters({...filters, minAmount: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">Importe Máx (€)</label>
+                        <input type="number" className="w-full bg-white border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-slate-800 outline-none" placeholder="Sin límite" value={filters.maxAmount} onChange={e => setFilters({...filters, maxAmount: e.target.value})} />
+                    </div>
+                </div>
+                <div className="flex justify-end border-t border-gray-200 pt-3">
+                    <button onClick={clearFilters} className="text-slate-500 text-xs font-bold hover:text-slate-800 flex items-center gap-1 hover:bg-gray-100 px-3 py-2 rounded">
+                        <RefreshIcon /> Limpiar Filtros
+                    </button>
+                </div>
+            </div>
+        )}
 
         {viewMode === 'list' ? (
             <div className="overflow-x-auto w-full">
@@ -412,7 +591,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
                         <td className="px-6 py-4 font-bold text-slate-800">{b.clientData.commercialName}</td>
                         <td className="px-6 py-4 text-slate-500 text-xs">{new Date(b.createdAt).toLocaleDateString()}</td>
                         <td className="px-6 py-4 font-bold font-mono text-slate-800">{calculateTotal(b).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</td>
-                        <td className="px-6 py-4"><span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${b.status === 'accepted' ? 'bg-green-100 text-green-800' : b.status === 'pending' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'}`}>{b.status}</span></td>
+                        <td className="px-6 py-4"><span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${b.status === 'accepted' ? 'bg-green-100 text-green-800' : b.status === 'pending' ? 'bg-orange-100 text-orange-800' : b.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>{b.status}</span></td>
                         <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                                 <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
@@ -432,6 +611,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
                 <KanbanColumn status="draft" title="Borradores" colorClass="text-slate-600 bg-slate-200" items={processedBudgets.filter(b => b.status === 'draft')} />
                 <KanbanColumn status="pending" title="Pendientes" colorClass="text-orange-600 bg-orange-200" items={processedBudgets.filter(b => b.status === 'pending')} />
                 <KanbanColumn status="accepted" title="Ganados" colorClass="text-green-600 bg-green-200" items={processedBudgets.filter(b => b.status === 'accepted')} />
+                <KanbanColumn status="rejected" title="Perdidos" colorClass="text-red-600 bg-red-200" items={processedBudgets.filter(b => b.status === 'rejected')} />
             </div>
         )}
       </div>

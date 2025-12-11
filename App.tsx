@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
@@ -10,6 +9,8 @@ import { BudgetEditor } from './components/BudgetEditor';
 import { PdfCustomizer } from './components/PdfCustomizer';
 import { Login } from './components/Login';
 import { AdminPanel } from './components/AdminPanel';
+import { ExpenseManager } from './components/ExpenseManager'; // NEW
+import { CalendarView } from './components/CalendarView'; // NEW
 import { Budget, SystemType, User } from './types';
 import { storageService } from './services/storage';
 import { authService } from './services/auth';
@@ -140,6 +141,8 @@ function App() {
         )}
         {currentView === 'clients' && <ClientManager />}
         {currentView === 'products' && <ProductManager />}
+        {currentView === 'expenses' && <ExpenseManager />}
+        {currentView === 'calendar' && <CalendarView />}
         {currentView === 'settings' && <Settings />}
         {currentView === 'pdf-customizer' && <PdfCustomizer />}
         {currentView === 'admin-panel' && authService.isAdmin(user) && <AdminPanel />}

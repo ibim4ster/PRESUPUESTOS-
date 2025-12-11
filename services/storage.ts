@@ -1,6 +1,5 @@
 
-
-import { Budget, Client, CompanyProfile, PdfConfig, Product, CloudConfig, SystemType, PdfSystemConfig, ProductKit, User, LogEntry, Task } from '../types';
+import { Budget, Client, CompanyProfile, PdfConfig, Product, CloudConfig, SystemType, PdfSystemConfig, ProductKit, User, LogEntry, Task, Expense } from '../types';
 import { initializeApp, FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, 
@@ -18,13 +17,14 @@ const KEYS = {
   CLIENTS: 'proquote_clients',
   PRODUCTS: 'proquote_products',
   KITS: 'proquote_kits',
-  TASKS: 'proquote_tasks', // New
+  TASKS: 'proquote_tasks', 
+  EXPENSES: 'proquote_expenses', // New
   COMPANY: 'proquote_company',
   PDF_CONFIG: 'proquote_pdf_config_v2', 
   CLOUD_CONFIG: 'proquote_cloud_config',
   USERS: 'proquote_users',
   LOGS: 'proquote_logs',
-  INIT: 'proquote_initialized_v8' // Bumped
+  INIT: 'proquote_initialized_v9' // Bumped
 };
 
 // --- LOGOS PRE-CARGADOS ---
@@ -152,6 +152,7 @@ const setupListeners = () => {
     startSync('products', KEYS.PRODUCTS);
     startSync('kits', KEYS.KITS);
     startSync('tasks', KEYS.TASKS);
+    startSync('expenses', KEYS.EXPENSES); // Sync Expenses
     startSync('users', KEYS.USERS);
     startSync('logs', KEYS.LOGS); 
     
@@ -267,6 +268,17 @@ export const storageService = {
                 { id: 't2', title: 'Preparar presupuesto para Modas Paquita', dueDate: new Date(Date.now() + 172800000).toISOString(), completed: false, priority: 'normal', assignedTo: 'admin-001' },
             ];
             saveLocal(KEYS.TASKS, mockTasks);
+        }
+
+        // MOCK EXPENSES
+        const existingExpenses = loadLocal<Expense[]>(KEYS.EXPENSES, []);
+        if (existingExpenses.length === 0) {
+            const mockExpenses: Expense[] = [
+                { id: 'e1', description: 'Alquiler Oficina', amount: 800, date: new Date().toISOString(), category: 'office', recurring: true },
+                { id: 'e2', description: 'Licencias Software Adobe', amount: 65, date: new Date().toISOString(), category: 'software', recurring: true },
+                { id: 'e3', description: 'Gasolina Visitas Comerciales', amount: 120, date: new Date(Date.now() - 432000000).toISOString(), category: 'travel', recurring: false },
+            ];
+            saveLocal(KEYS.EXPENSES, mockExpenses);
         }
 
         localStorage.setItem(KEYS.INIT, KEYS.INIT);
@@ -422,6 +434,22 @@ export const storageService = {
       notify();
   },
 
+  // EXPENSES
+  getExpenses: () => loadLocal<Expense[]>(KEYS.EXPENSES, []),
+  saveExpense: (expense: Expense) => {
+      const expenses = storageService.getExpenses();
+      const index = expenses.findIndex(e => e.id === expense.id);
+      if (index >= 0) expenses[index] = expense; else expenses.push(expense);
+      saveLocal(KEYS.EXPENSES, expenses);
+      pushToCloud('expenses', expense);
+      notify();
+  },
+  deleteExpense: (id: string) => {
+      saveLocal(KEYS.EXPENSES, storageService.getExpenses().filter(e => e.id !== id));
+      deleteFromCloud('expenses', id);
+      notify();
+  },
+
   getCompanyProfile: () => loadLocal<CompanyProfile>(KEYS.COMPANY, { name: '', cif: '', address: '', email: '', phone: '', terms: '' }),
   saveCompanyProfile: (profile: CompanyProfile) => {
       saveLocal(KEYS.COMPANY, profile);
@@ -454,6 +482,7 @@ export const storageService = {
       products: storageService.getProducts(),
       kits: storageService.getProductKits(),
       tasks: storageService.getTasks(),
+      expenses: storageService.getExpenses(),
       company: storageService.getCompanyProfile(),
       pdfConfig: storageService.getPdfConfig(),
       users: storageService.getUsers(),
@@ -475,6 +504,7 @@ export const storageService = {
       if(data.products) saveLocal(KEYS.PRODUCTS, data.products);
       if(data.kits) saveLocal(KEYS.KITS, data.kits);
       if(data.tasks) saveLocal(KEYS.TASKS, data.tasks);
+      if(data.expenses) saveLocal(KEYS.EXPENSES, data.expenses);
       if(data.company) saveLocal(KEYS.COMPANY, data.company);
       if(data.pdfConfig) saveLocal(KEYS.PDF_CONFIG, data.pdfConfig);
       if(data.users) saveLocal(KEYS.USERS, data.users);

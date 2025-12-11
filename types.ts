@@ -36,6 +36,17 @@ export interface Task {
   relatedBudgetNumber?: string;
 }
 
+// NEW: Expense Tracking
+export interface Expense {
+    id: string;
+    description: string;
+    amount: number;
+    date: string;
+    category: 'office' | 'travel' | 'software' | 'marketing' | 'salary' | 'other';
+    reference?: string; // Invoice number
+    recurring: boolean;
+}
+
 export interface Product {
   id: string;
   reference: string;
@@ -110,6 +121,8 @@ export interface Budget {
   createdAt: string; 
   updatedAt: string;
   status: 'draft' | 'pending' | 'accepted' | 'rejected';
+  rejectionReason?: string; // NEW: Why was it rejected?
+  
   clientId: string;
   clientData: Client; 
   validityDays: number;
@@ -118,6 +131,9 @@ export interface Budget {
   
   createdBy?: string; 
   creatorName?: string; 
+
+  // NEW: Introduction text for PDF
+  presentationText?: string;
 
   lineItems: LineItem[];
   

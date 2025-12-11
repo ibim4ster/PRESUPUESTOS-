@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storage';
 import { authService } from '../services/auth';
@@ -151,7 +150,7 @@ export const Settings: React.FC = () => {
                   <div className="relative">
                       <input 
                         type="number" 
-                        className="w-full border border-gray-300 rounded-lg p-3 text-slate-900 font-mono font-bold pl-8 focus:ring-2 focus:ring-slate-900 outline-none"
+                        className="w-full border border-gray-300 rounded-lg p-3 text-slate-900 bg-white font-mono font-bold pl-8 focus:ring-2 focus:ring-slate-900 outline-none"
                         value={monthlyGoal}
                         onChange={(e) => setMonthlyGoal(parseFloat(e.target.value))}
                       />

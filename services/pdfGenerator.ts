@@ -165,6 +165,16 @@ export const generateBudgetPdf = (
 
   yPos += 45;
 
+  // --- PRESENTATION TEXT (NEW) ---
+  if (budget.presentationText) {
+      doc.setFontSize(9);
+      doc.setTextColor(60);
+      doc.setFont('helvetica', 'normal');
+      const splitText = doc.splitTextToSize(budget.presentationText, pageWidth - 30);
+      doc.text(splitText, 15, yPos);
+      yPos += (splitText.length * 5) + 10;
+  }
+
   // --- TABLE ---
   const tableColumn = ["Concepto", "Uds", "Precio", "Dto %", "Total"];
   if (config.showImages) tableColumn.unshift("Img");
