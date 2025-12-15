@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { storageService } from '../services/storage';
 import { generateBudgetPdf } from '../services/pdfGenerator';
-import { Budget, Client, LineItem, Product, PdfConfig, SystemType, ProductKit, User, BudgetEvent, PaymentTerm } from '../types';
+import { aiService } from '../services/ai';
+import { Budget, Client, LineItem, Product, PdfConfig, SystemType, ProductKit, User, BudgetEvent, PaymentTerm, EmailTemplate } from '../types';
 import { SearchableSelect } from './SearchableSelect';
 
 interface BudgetEditorProps {
@@ -31,6 +32,7 @@ const TrendingUpIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" 
 const EyeOffIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07-2.3 2.3"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
 const CalendarIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
 const MessageSquareIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
+const SparklesIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M9 3v4"/><path d="M3 5h4"/><path d="M3 9h4"/></svg>;
 
 const SignaturePad = ({ onSave, onClear, initial }: { onSave: (data: string) => void, onClear: () => void, initial?: string }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -164,6 +166,12 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [pendingRejection, setPendingRejection] = useState<string | null>(null);
 
+  // Email Modal
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailData, setEmailData] = useState({ to: '', subject: '', body: '' });
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+
   // --- KEYBOARD SHORTCUTS ---
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
@@ -174,18 +182,20 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
               onShowToast('Presupuesto Guardado', 'success');
           }
           // ESC to Close Preview
-          if (e.key === 'Escape' && showPreviewModal) {
+          if (e.key === 'Escape' && (showPreviewModal || showEmailModal)) {
               closePreview();
+              setShowEmailModal(false);
           }
       };
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [budget, showPreviewModal]);
+  }, [budget, showPreviewModal, showEmailModal]);
 
   useEffect(() => {
     setClients(storageService.getClients());
     setProducts(storageService.getProducts());
     setKits(storageService.getProductKits());
+    setTemplates(storageService.getTemplates());
   }, []);
 
   useEffect(() => {
@@ -372,12 +382,67 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
   const handleGeneratePDF = () => { saveWithLogs(); const doc = generateBudgetPdf(budget, company, pdfConfig); const fileName = `Presupuesto_${budget.number}_${budget.clientData.commercialName}.pdf`; doc.save(fileName); };
   const handlePreview = () => { saveWithLogs(); try { const doc = generateBudgetPdf(budget, company, pdfConfig); const blob = doc.output('blob'); const url = URL.createObjectURL(blob); setPreviewUrl(url); setShowPreviewModal(true); } catch (e) { onShowToast("Error generando vista previa", 'error'); } };
   const closePreview = () => { if (previewUrl) { URL.revokeObjectURL(previewUrl); } setShowPreviewModal(false); setPreviewUrl(null); };
-  const handleSendEmail = () => { if (!budget.clientData.email) return onShowToast('El cliente no tiene email registrado', 'error'); saveWithLogs(); const subject = encodeURIComponent(`Presupuesto ${budget.number} - ${company.name}`); const body = encodeURIComponent(`Estimado/a ${budget.clientData.commercialName},\n\nAdjunto le remitimos el presupuesto nº ${budget.number} solicitado.\n\nQuedamos a su disposición para cualquier duda.\n\nAtentamente,\n${company.name}`); window.location.href = `mailto:${budget.clientData.email}?subject=${subject}&body=${body}`; };
+  
+  // EMAIL HANDLING
+  const openEmailModal = () => {
+      if (!budget.clientData.email) return onShowToast('El cliente no tiene email registrado', 'error');
+      setEmailData({ 
+          to: budget.clientData.email, 
+          subject: `Presupuesto ${budget.number} - ${company.name}`, 
+          body: `Estimado/a ${budget.clientData.commercialName},\n\nAdjunto le remitimos el presupuesto nº ${budget.number}.\n\nQuedamos a la espera de sus comentarios.\n\nAtentamente,\n${company.name}` 
+      });
+      setShowEmailModal(true);
+  };
+
+  const applyTemplate = (tplId: string) => {
+      const tpl = templates.find(t => t.id === tplId);
+      if(!tpl) return;
+      const parsedBody = tpl.body
+        .replace('{{cliente}}', budget.clientData.commercialName)
+        .replace('{{numero}}', budget.number)
+        .replace('{{total}}', total.toFixed(2));
+      
+      const parsedSubject = tpl.subject.replace('{{numero}}', budget.number);
+      
+      setEmailData({ ...emailData, subject: parsedSubject, body: parsedBody });
+  };
+
+  const generateAiEmail = async () => {
+      if(!aiService.isAvailable()) return onShowToast('Configura tu API KEY en .env', 'error');
+      setIsAiGenerating(true);
+      const res = await aiService.generateEmail('send', budget.clientData.commercialName, budget.number);
+      setEmailData({ ...emailData, subject: res.subject, body: res.body });
+      setIsAiGenerating(false);
+  };
+
+  const generateAiIntro = async () => {
+      if(!aiService.isAvailable()) return onShowToast('Configura tu API KEY en .env', 'error');
+      setIsAiGenerating(true);
+      const products = budget.lineItems.filter(l => l.type === 'product').map(l => l.description);
+      const intro = await aiService.generateIntro(budget.clientData.commercialName, products);
+      if(intro) updateBudget({ presentationText: intro });
+      setIsAiGenerating(false);
+  };
+
+  const handleSendRealEmail = () => {
+      saveWithLogs(); 
+      const subject = encodeURIComponent(emailData.subject); 
+      const body = encodeURIComponent(emailData.body); 
+      window.location.href = `mailto:${emailData.to}?subject=${subject}&body=${body}`;
+      setShowEmailModal(false);
+  };
 
   const availableProducts = products.filter(p => !p.system || p.system === 'both' || p.system === currentSystem);
   const availableKits = kits.filter(k => !k.system || k.system === 'both' || k.system === currentSystem);
   const clientOptions = clients.map(c => ({ label: c.commercialName, value: c.id, subLabel: c.legalName }));
-  const productOptions = availableProducts.map(p => ({ label: `${p.reference} - ${p.description.substring(0, 30)}...`, value: p.id, subLabel: `${p.price.toFixed(2)}€`, image: p.image }));
+  
+  // UPDATED: Show stock in dropdown
+  const productOptions = availableProducts.map(p => ({ 
+      label: `${p.reference} - ${p.description.substring(0, 30)}... (Stock: ${p.stock || 0})`, 
+      value: p.id, 
+      subLabel: `${p.price.toFixed(2)}€`, 
+      image: p.image 
+  }));
   const kitOptions = availableKits.map(k => ({ label: `📦 PACK: ${k.reference}`, value: k.id, subLabel: k.description }));
 
   return (
@@ -402,7 +467,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
                       <GitBranchIcon /> <span className="hidden lg:inline">Crear Revisión</span>
                   </button>
               )}
-              <button onClick={handleSendEmail} className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-medium text-sm flex items-center gap-2" title="Enviar Email al Cliente"><MailIcon /> <span className="hidden md:inline">Email</span></button><button onClick={handlePreview} className="flex-1 md:flex-none justify-center px-4 py-3 md:py-2 text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-sm flex items-center gap-2 font-medium text-sm"><EyeIcon /> Vista Previa</button><button onClick={handleGeneratePDF} className={`flex-1 md:flex-none justify-center px-4 py-3 md:py-2 rounded-lg shadow-md flex items-center gap-2 font-medium text-sm transition-colors ${saveBtnColor}`}><SaveIcon /> Generar PDF</button></div>
+              <button onClick={openEmailModal} className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-medium text-sm flex items-center gap-2" title="Enviar Email al Cliente"><MailIcon /> <span className="hidden md:inline">Email</span></button><button onClick={handlePreview} className="flex-1 md:flex-none justify-center px-4 py-3 md:py-2 text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-sm flex items-center gap-2 font-medium text-sm"><EyeIcon /> Vista Previa</button><button onClick={handleGeneratePDF} className={`flex-1 md:flex-none justify-center px-4 py-3 md:py-2 rounded-lg shadow-md flex items-center gap-2 font-medium text-sm transition-colors ${saveBtnColor}`}><SaveIcon /> Generar PDF</button></div>
         </div>
 
         <div className="p-4 md:p-8 space-y-8 max-w-5xl mx-auto w-full">
@@ -442,13 +507,22 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
           </section>
 
           {/* Presentation Text Area */}
-          <section className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-              <h3 className="text-sm font-bold text-slate-800 mb-2 flex items-center gap-2">
-                  <MessageSquareIcon /> Carta de Presentación / Introducción
-              </h3>
+          <section className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 relative group">
+              <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                      <MessageSquareIcon /> Carta de Presentación
+                  </h3>
+                  <button 
+                    onClick={generateAiIntro} 
+                    disabled={isAiGenerating}
+                    className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-bold flex items-center gap-2 hover:bg-purple-200 transition-colors"
+                  >
+                      <SparklesIcon /> {isAiGenerating ? 'Redactando...' : 'Generar con IA'}
+                  </button>
+              </div>
               <textarea 
                   className="w-full border border-gray-300 rounded-lg p-3 text-sm bg-white text-slate-800 h-24 focus:ring-2 focus:ring-slate-800 outline-none resize-none"
-                  placeholder="Escriba aquí una introducción personalizada para el cliente que aparecerá al inicio del PDF..."
+                  placeholder="Escriba aquí una introducción personalizada..."
                   value={budget.presentationText || ''}
                   onChange={e => updateBudget({ presentationText: e.target.value })}
               />
@@ -595,6 +669,60 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({ initialBudget, onClo
                         className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                           Confirmar Rechazo
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Email Modal */}
+      {showEmailModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+              <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                  <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                      <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2"><MailIcon /> Enviar Email al Cliente</h3>
+                      <button onClick={() => setShowEmailModal(false)} className="text-slate-400 hover:text-slate-600"><XIcon /></button>
+                  </div>
+                  <div className="p-6 flex-1 overflow-y-auto space-y-4">
+                      
+                      <div className="flex gap-2 overflow-x-auto pb-2">
+                          {templates.map(tpl => (
+                              <button 
+                                key={tpl.id} 
+                                onClick={() => applyTemplate(tpl.id)}
+                                className="px-3 py-1 bg-white border border-gray-200 rounded-full text-xs font-bold text-slate-600 hover:bg-slate-100 whitespace-nowrap"
+                              >
+                                  {tpl.name}
+                              </button>
+                          ))}
+                          <button 
+                            onClick={generateAiEmail} 
+                            disabled={isAiGenerating}
+                            className="px-3 py-1 bg-purple-50 border border-purple-200 rounded-full text-xs font-bold text-purple-700 hover:bg-purple-100 whitespace-nowrap flex items-center gap-1"
+                          >
+                              <SparklesIcon /> {isAiGenerating ? 'Generando...' : 'Redactar con IA'}
+                          </button>
+                      </div>
+
+                      <div className="grid gap-4">
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1">Destinatario</label>
+                              <input className="w-full border border-gray-300 rounded p-2 text-sm bg-white text-slate-900" value={emailData.to} readOnly />
+                          </div>
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1">Asunto</label>
+                              <input className="w-full border border-gray-300 rounded p-2 text-sm bg-white text-slate-900 font-bold" value={emailData.subject} onChange={e => setEmailData({...emailData, subject: e.target.value})} />
+                          </div>
+                          <div className="flex-1">
+                              <label className="block text-xs font-bold text-slate-500 mb-1">Mensaje</label>
+                              <textarea className="w-full border border-gray-300 rounded p-2 text-sm bg-white text-slate-900 h-60 resize-none leading-relaxed" value={emailData.body} onChange={e => setEmailData({...emailData, body: e.target.value})} />
+                          </div>
+                      </div>
+                  </div>
+                  <div className="p-4 border-t border-gray-100 flex justify-end gap-2 bg-gray-50">
+                      <button onClick={() => setShowEmailModal(false)} className="px-4 py-2 text-slate-600 hover:bg-gray-200 rounded font-bold text-sm">Cancelar</button>
+                      <button onClick={handleSendRealEmail} className="px-6 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded font-bold text-sm flex items-center gap-2 shadow-md">
+                          <SendIcon /> Abrir Correo
                       </button>
                   </div>
               </div>

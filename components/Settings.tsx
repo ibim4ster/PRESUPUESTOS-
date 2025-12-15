@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storage';
 import { authService } from '../services/auth';
 import { CompanyProfile, CloudConfig, AppTheme } from '../types';
+import { EmailTemplates } from './EmailTemplates'; // NEW IMPORT
 
 export const Settings: React.FC = () => {
   const [company, setCompany] = useState<CompanyProfile>({ name: '', cif: '', address: '', email: '', phone: '', terms: '' });
@@ -107,7 +108,7 @@ export const Settings: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12">
       <h2 className="text-2xl font-bold text-primary">Configuración Global</h2>
 
       {/* PERSONAL PREFERENCES */}
@@ -159,6 +160,11 @@ export const Settings: React.FC = () => {
                   <p className="text-xs text-slate-500 mt-2">Introduce tu meta de facturación mensual para ver la barra de progreso en el Dashboard.</p>
               </div>
           </div>
+      </section>
+
+      {/* NEW: Email Templates */}
+      <section>
+          <EmailTemplates />
       </section>
 
       {/* Cloud Sync - ONLY ADMIN */}

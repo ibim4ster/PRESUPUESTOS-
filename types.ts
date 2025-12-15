@@ -47,6 +47,14 @@ export interface Expense {
     recurring: boolean;
 }
 
+// NEW: Email Templates
+export interface EmailTemplate {
+    id: string;
+    name: string;
+    subject: string;
+    body: string; // Supports simple variables like {{client}}, {{number}}
+}
+
 export interface Product {
   id: string;
   reference: string;
@@ -54,6 +62,8 @@ export interface Product {
   price: number;
   costPrice?: number; 
   category?: string; // New: Product Categorization
+  stock?: number; // NEW: Inventory
+  minStock?: number; // NEW: Inventory Alert Level
   image?: string; 
   system: SystemType | 'both'; 
   isRecurring?: boolean; 

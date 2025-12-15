@@ -1,5 +1,5 @@
 
-import { Budget, Client, CompanyProfile, PdfConfig, Product, CloudConfig, SystemType, PdfSystemConfig, ProductKit, User, LogEntry, Task, Expense } from '../types';
+import { Budget, Client, CompanyProfile, PdfConfig, Product, CloudConfig, SystemType, PdfSystemConfig, ProductKit, User, LogEntry, Task, Expense, EmailTemplate } from '../types';
 import { initializeApp, FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, 
@@ -8,7 +8,9 @@ import {
   setDoc, 
   deleteDoc, 
   onSnapshot, 
-  Firestore 
+  Firestore,
+  QuerySnapshot,
+  DocumentData 
 } from 'firebase/firestore';
 import { authService } from './auth';
 
@@ -18,13 +20,14 @@ const KEYS = {
   PRODUCTS: 'proquote_products',
   KITS: 'proquote_kits',
   TASKS: 'proquote_tasks', 
-  EXPENSES: 'proquote_expenses', // New
+  EXPENSES: 'proquote_expenses', 
+  TEMPLATES: 'proquote_email_templates', // New
   COMPANY: 'proquote_company',
   PDF_CONFIG: 'proquote_pdf_config_v2', 
   CLOUD_CONFIG: 'proquote_cloud_config',
   USERS: 'proquote_users',
   LOGS: 'proquote_logs',
-  INIT: 'proquote_initialized_v9' // Bumped
+  INIT: 'proquote_initialized_v11' // Bumped for Templates
 };
 
 // --- LOGOS PRE-CARGADOS ---
@@ -152,7 +155,8 @@ const setupListeners = () => {
     startSync('products', KEYS.PRODUCTS);
     startSync('kits', KEYS.KITS);
     startSync('tasks', KEYS.TASKS);
-    startSync('expenses', KEYS.EXPENSES); // Sync Expenses
+    startSync('expenses', KEYS.EXPENSES);
+    startSync('templates', KEYS.TEMPLATES); // Sync Email Templates
     startSync('users', KEYS.USERS);
     startSync('logs', KEYS.LOGS); 
     
@@ -176,7 +180,7 @@ const setupListeners = () => {
 const startSync = (collectionName: string, localKey: string) => {
   if (!db) return;
   const colRef = collection(db, collectionName);
-  const unsub = onSnapshot(colRef, (snapshot) => {
+  const unsub = onSnapshot(colRef, (snapshot: QuerySnapshot<DocumentData>) => {
     const cloudData: any[] = [];
     snapshot.forEach(doc => cloudData.push(doc.data()));
     if (cloudData.length > 0 || snapshot.size > 0) { 
@@ -250,35 +254,24 @@ export const storageService = {
 
         saveLocal(KEYS.PDF_CONFIG, mergedPdf);
         
-        // MOCK PRODUCTS UPDATE (ADD RECURRING)
+        // UPDATE PRODUCTS
         const products = loadLocal<Product[]>(KEYS.PRODUCTS, []);
         const updatedProducts = products.map(p => {
-            if (p.reference.startsWith('SFT') || p.reference.startsWith('SOP')) {
-                return { ...p, isRecurring: true, frequency: 'yearly' as const };
-            }
-            return p;
+            const isRecurring = p.reference.startsWith('SFT') || p.reference.startsWith('SOP');
+            const stock = p.stock !== undefined ? p.stock : Math.floor(Math.random() * 50);
+            const minStock = p.minStock !== undefined ? p.minStock : 5;
+            return { ...p, isRecurring, frequency: isRecurring ? ('yearly' as const) : undefined, stock, minStock };
         });
         saveLocal(KEYS.PRODUCTS, updatedProducts);
 
-        // MOCK TASKS
-        const existingTasks = loadLocal<Task[]>(KEYS.TASKS, []);
-        if (existingTasks.length === 0) {
-            const mockTasks: Task[] = [
-                { id: 't1', title: 'Llamar a Restaurante El Puerto para confirmar pedido', dueDate: new Date(Date.now() + 86400000).toISOString(), completed: false, priority: 'high', assignedTo: 'admin-001' },
-                { id: 't2', title: 'Preparar presupuesto para Modas Paquita', dueDate: new Date(Date.now() + 172800000).toISOString(), completed: false, priority: 'normal', assignedTo: 'admin-001' },
+        // MOCK EMAIL TEMPLATES
+        const templates = loadLocal<EmailTemplate[]>(KEYS.TEMPLATES, []);
+        if (templates.length === 0) {
+            const mocks: EmailTemplate[] = [
+                { id: 'tpl1', name: 'Envío Presupuesto', subject: 'Presupuesto {{numero}} - Propuesta Comercial', body: 'Estimado/a {{cliente}},\n\nAdjunto le remito el presupuesto solicitado.\n\nQuedamos a su disposición para cualquier duda.\n\nAtentamente,\nEl Equipo Comercial' },
+                { id: 'tpl2', name: 'Seguimiento', subject: 'Seguimiento Presupuesto {{numero}}', body: 'Hola {{cliente}},\n\n¿Ha tenido oportunidad de revisar la propuesta enviada?\n\nSaludos.' }
             ];
-            saveLocal(KEYS.TASKS, mockTasks);
-        }
-
-        // MOCK EXPENSES
-        const existingExpenses = loadLocal<Expense[]>(KEYS.EXPENSES, []);
-        if (existingExpenses.length === 0) {
-            const mockExpenses: Expense[] = [
-                { id: 'e1', description: 'Alquiler Oficina', amount: 800, date: new Date().toISOString(), category: 'office', recurring: true },
-                { id: 'e2', description: 'Licencias Software Adobe', amount: 65, date: new Date().toISOString(), category: 'software', recurring: true },
-                { id: 'e3', description: 'Gasolina Visitas Comerciales', amount: 120, date: new Date(Date.now() - 432000000).toISOString(), category: 'travel', recurring: false },
-            ];
-            saveLocal(KEYS.EXPENSES, mockExpenses);
+            saveLocal(KEYS.TEMPLATES, mocks);
         }
 
         localStorage.setItem(KEYS.INIT, KEYS.INIT);
@@ -450,6 +443,22 @@ export const storageService = {
       notify();
   },
 
+  // EMAIL TEMPLATES
+  getTemplates: () => loadLocal<EmailTemplate[]>(KEYS.TEMPLATES, []),
+  saveTemplate: (tpl: EmailTemplate) => {
+      const tpls = storageService.getTemplates();
+      const index = tpls.findIndex(t => t.id === tpl.id);
+      if(index >= 0) tpls[index] = tpl; else tpls.push(tpl);
+      saveLocal(KEYS.TEMPLATES, tpls);
+      pushToCloud('templates', tpl);
+      notify();
+  },
+  deleteTemplate: (id: string) => {
+      saveLocal(KEYS.TEMPLATES, storageService.getTemplates().filter(t => t.id !== id));
+      deleteFromCloud('templates', id);
+      notify();
+  },
+
   getCompanyProfile: () => loadLocal<CompanyProfile>(KEYS.COMPANY, { name: '', cif: '', address: '', email: '', phone: '', terms: '' }),
   saveCompanyProfile: (profile: CompanyProfile) => {
       saveLocal(KEYS.COMPANY, profile);
@@ -483,6 +492,7 @@ export const storageService = {
       kits: storageService.getProductKits(),
       tasks: storageService.getTasks(),
       expenses: storageService.getExpenses(),
+      templates: storageService.getTemplates(),
       company: storageService.getCompanyProfile(),
       pdfConfig: storageService.getPdfConfig(),
       users: storageService.getUsers(),
@@ -505,6 +515,7 @@ export const storageService = {
       if(data.kits) saveLocal(KEYS.KITS, data.kits);
       if(data.tasks) saveLocal(KEYS.TASKS, data.tasks);
       if(data.expenses) saveLocal(KEYS.EXPENSES, data.expenses);
+      if(data.templates) saveLocal(KEYS.TEMPLATES, data.templates);
       if(data.company) saveLocal(KEYS.COMPANY, data.company);
       if(data.pdfConfig) saveLocal(KEYS.PDF_CONFIG, data.pdfConfig);
       if(data.users) saveLocal(KEYS.USERS, data.users);

@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { storageService } from '../services/storage';
 import { Budget, SystemType, Task, User, LogEntry } from '../types';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from 'recharts';
 import { authService } from '../services/auth';
 
 interface DashboardProps {
@@ -23,7 +23,6 @@ const LayoutKanbanIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16
 const DownloadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
 const CheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
 const TrophyIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>;
-const ActivityIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>;
 const FilterIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>;
 const RefreshIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>;
 
@@ -47,8 +46,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [stats, setStats] = useState({ totalMonth: 0, pending: 0, accepted: 0, recurring: 0 });
+  const [stats, setStats] = useState({ totalMonth: 0, pending: 0, accepted: 0, recurring: 0, goal: 0 });
   const [chartData, setChartData] = useState<any[]>([]);
+  const [categoryData, setCategoryData] = useState<any[]>([]); // New for Pie Chart
   
   // Analytics State
   const [topProducts, setTopProducts] = useState<{name: string, count: number, revenue: number}[]>([]);
@@ -78,6 +78,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
 
   const loadData = () => {
     const allBudgets = storageService.getBudgets().filter(b => (b.system || 'agora') === currentSystem);
+    const products = storageService.getProducts();
     setBudgets([...allBudgets]); 
     setLogs(storageService.getLogs().slice(0, 10)); // Get last 10 logs
     
@@ -104,10 +105,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
       totalMonth: monthlyTotal,
       pending: allBudgets.filter(b => b.status === 'pending').length,
       accepted: allBudgets.filter(b => b.status === 'accepted').length,
-      recurring: recurringTotal
+      recurring: recurringTotal,
+      goal: currentUser?.monthlyGoal || 0
     });
 
-    // Chart Data
+    // Chart Data (Sales Evolution)
     const months = [];
     for (let i = 5; i >= 0; i--) {
         const d = new Date();
@@ -121,9 +123,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
     }
     setChartData(months);
 
-    // --- ADVANCED ANALYTICS (Accepted Budgets Only) ---
+    // --- CATEGORY CHART DATA ---
+    const catMap: Record<string, number> = {};
     const acceptedBudgets = allBudgets.filter(b => b.status === 'accepted');
     
+    acceptedBudgets.forEach(b => {
+        b.lineItems.forEach(item => {
+            if(item.type === 'product' && item.productId) {
+                const prod = products.find(p => p.id === item.productId);
+                const category = prod?.category || 'Otros';
+                const amount = item.units * item.price * (1 - (item.discount||0)/100);
+                catMap[category] = (catMap[category] || 0) + amount;
+            }
+        });
+    });
+    
+    const catData = Object.entries(catMap)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a,b) => b.value - a.value);
+    
+    setCategoryData(catData);
+
+    // --- ADVANCED ANALYTICS (Accepted Budgets Only) ---
     // Top Products
     const prodMap: Record<string, {name: string, count: number, revenue: number}> = {};
     acceptedBudgets.forEach(b => {
@@ -153,6 +174,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
 
   const monthlyGoal = currentUser?.monthlyGoal || 0;
   const progressPercent = monthlyGoal > 0 ? Math.min(100, (stats.totalMonth / monthlyGoal) * 100) : 0;
+
+  // Pie Chart Colors
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
   const handleAddTask = (e: React.FormEvent) => {
       e.preventDefault();
@@ -316,7 +340,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
 
       {/* GAMIFICATION & STATS */}
       {monthlyGoal > 0 && (
-          <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-6 rounded-2xl shadow-lg text-white flex flex-col md:flex-row items-center gap-6 relative overflow-hidden">
+          <div className="bg-slate-900 p-6 rounded-2xl shadow-lg text-white flex flex-col md:flex-row items-center gap-6 relative overflow-hidden">
               <div className="absolute right-0 top-0 h-full w-1/3 bg-white/5 skew-x-12"></div>
               <div className="flex items-center gap-4 z-10">
                   <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
@@ -434,9 +458,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
           </div>
 
           {/* RIGHT: Tasks & Activity (TABBED) */}
-          <div className="xl:col-span-1 h-full">
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden h-[454px] xl:h-full sticky top-4">
-                  
+          <div className="xl:col-span-1 h-full space-y-6">
+              
+              {/* SALES BY CATEGORY PIE CHART */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-[300px] flex flex-col">
+                  <h3 className="text-sm font-bold text-slate-800 uppercase mb-2">Ventas por Categoría</h3>
+                  <div className="flex-1 min-h-0">
+                      {categoryData.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                  <Pie
+                                      data={categoryData}
+                                      cx="50%"
+                                      cy="50%"
+                                      innerRadius={50}
+                                      outerRadius={80}
+                                      fill="#8884d8"
+                                      paddingAngle={5}
+                                      dataKey="value"
+                                  >
+                                      {categoryData.map((entry, index) => (
+                                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                      ))}
+                                  </Pie>
+                                  <Tooltip formatter={(val: number) => val.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })} />
+                                  <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                              </PieChart>
+                          </ResponsiveContainer>
+                      ) : (
+                          <div className="h-full flex items-center justify-center text-slate-400 text-xs italic">
+                              Sin datos de ventas aceptadas.
+                          </div>
+                      )}
+                  </div>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden h-[454px] xl:h-auto xl:flex-1 sticky top-4">
                   {/* TABS */}
                   <div className="flex border-b border-gray-100 bg-gray-50/50 p-1 gap-1">
                       <button 
@@ -454,8 +511,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
                   </div>
 
                   {/* CONTENT */}
-                  <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-white">
-                      
+                  <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-white min-h-[200px]">
                       {rightPanelTab === 'tasks' ? (
                           <div className="space-y-2">
                               {tasks.map(task => (

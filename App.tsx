@@ -9,8 +9,9 @@ import { BudgetEditor } from './components/BudgetEditor';
 import { PdfCustomizer } from './components/PdfCustomizer';
 import { Login } from './components/Login';
 import { AdminPanel } from './components/AdminPanel';
-import { ExpenseManager } from './components/ExpenseManager'; // NEW
-import { CalendarView } from './components/CalendarView'; // NEW
+import { ExpenseManager } from './components/ExpenseManager';
+import { CalendarView } from './components/CalendarView';
+import { CommandPalette } from './components/CommandPalette'; // NEW
 import { Budget, SystemType, User } from './types';
 import { storageService } from './services/storage';
 import { authService } from './services/auth';
@@ -25,6 +26,9 @@ function App() {
   // Notification State
   const [notification, setNotification] = useState<{show: boolean, type: 'system' | 'success' | 'error', text: string, subtext?: string} | null>(null);
   const notificationTimeoutRef = useRef<number | null>(null);
+
+  // Command Palette State
+  const [isCmdOpen, setIsCmdOpen] = useState(false);
 
   useEffect(() => {
     const sessionUser = authService.getSession();
@@ -50,6 +54,18 @@ function App() {
       });
       return unsub;
   }, [user]);
+
+  // --- CMD+K LISTENER ---
+  useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+              e.preventDefault();
+              setIsCmdOpen(prev => !prev);
+          }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const playNotificationSound = (type: 'success' | 'error' | 'system' = 'system') => {
       try {
@@ -223,6 +239,13 @@ function App() {
           />
         )}
       </Layout>
+
+      <CommandPalette 
+        isOpen={isCmdOpen}
+        onClose={() => setIsCmdOpen(false)}
+        onNavigate={navigate}
+        onEditBudget={handleEditBudget}
+      />
 
       {/* PREMIUM NOTIFICATION COMPONENT */}
       <div 
