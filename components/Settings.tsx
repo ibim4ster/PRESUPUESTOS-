@@ -107,9 +107,20 @@ export const Settings: React.FC = () => {
     }
   }
 
+  const handleForceReload = () => {
+      if(confirm('Esto recargará la aplicación para obtener la última versión. ¿Continuar?')) {
+          window.location.reload();
+      }
+  };
+
   return (
     <div className="space-y-6 pb-12">
-      <h2 className="text-2xl font-bold text-primary">Configuración Global</h2>
+      <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold text-primary">Configuración Global</h2>
+          <button onClick={handleForceReload} className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded font-bold border border-gray-200 transition-colors">
+              🔄 Forzar Actualización
+          </button>
+      </div>
 
       {/* PERSONAL PREFERENCES */}
       <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">

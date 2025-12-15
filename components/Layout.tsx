@@ -93,10 +93,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         <div className="p-6 border-b border-white/10">
-          <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            <div className={`w-8 h-8 ${logoColor} rounded-lg flex items-center justify-center text-white text-lg transition-colors duration-300 shadow-lg`}>G</div>
-            <span>Gravity</span>
-          </h1>
+          <div className="flex justify-between items-start">
+              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                <div className={`w-8 h-8 ${logoColor} rounded-lg flex items-center justify-center text-white text-lg transition-colors duration-300 shadow-lg`}>G</div>
+                <span>Gravity</span>
+              </h1>
+              <span className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded text-white/60 font-mono">v2.2</span>
+          </div>
           
           <div className="mt-4 flex items-center gap-2 bg-white/5 p-2 rounded-lg border border-white/10">
              <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-xs font-bold text-white">
