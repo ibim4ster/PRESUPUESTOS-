@@ -21,13 +21,13 @@ const KEYS = {
   KITS: 'proquote_kits',
   TASKS: 'proquote_tasks', 
   EXPENSES: 'proquote_expenses', 
-  TEMPLATES: 'proquote_email_templates', // New
+  TEMPLATES: 'proquote_email_templates', 
   COMPANY: 'proquote_company',
   PDF_CONFIG: 'proquote_pdf_config_v2', 
   CLOUD_CONFIG: 'proquote_cloud_config',
   USERS: 'proquote_users',
   LOGS: 'proquote_logs',
-  INIT: 'proquote_initialized_v11' // Bumped for Templates
+  INIT: 'proquote_initialized_v12' // Bumped version
 };
 
 // --- LOGOS PRE-CARGADOS ---
@@ -238,42 +238,7 @@ export const storageService = {
     initFirebase();
 
     if (initVersion !== KEYS.INIT) {
-        const currentPdf = loadLocal<PdfConfig>(KEYS.PDF_CONFIG, DEFAULT_PDF_CONFIG);
-        const mergedPdf = { ...DEFAULT_PDF_CONFIG, ...currentPdf };
-        
-        // Ensure new cover page options exist
-        ['agora', 'sage', 'sage200', 'sagedespachos'].forEach(k => {
-            // @ts-ignore
-            if (mergedPdf[k] && typeof mergedPdf[k].showCoverPage === 'undefined') {
-                // @ts-ignore
-                mergedPdf[k].showCoverPage = true;
-                // @ts-ignore
-                mergedPdf[k].coverTitle = 'PROPUESTA COMERCIAL';
-            }
-        });
-
-        saveLocal(KEYS.PDF_CONFIG, mergedPdf);
-        
-        // UPDATE PRODUCTS
-        const products = loadLocal<Product[]>(KEYS.PRODUCTS, []);
-        const updatedProducts = products.map(p => {
-            const isRecurring = p.reference.startsWith('SFT') || p.reference.startsWith('SOP');
-            const stock = p.stock !== undefined ? p.stock : Math.floor(Math.random() * 50);
-            const minStock = p.minStock !== undefined ? p.minStock : 5;
-            return { ...p, isRecurring, frequency: isRecurring ? ('yearly' as const) : undefined, stock, minStock };
-        });
-        saveLocal(KEYS.PRODUCTS, updatedProducts);
-
-        // MOCK EMAIL TEMPLATES
-        const templates = loadLocal<EmailTemplate[]>(KEYS.TEMPLATES, []);
-        if (templates.length === 0) {
-            const mocks: EmailTemplate[] = [
-                { id: 'tpl1', name: 'Envío Presupuesto', subject: 'Presupuesto {{numero}} - Propuesta Comercial', body: 'Estimado/a {{cliente}},\n\nAdjunto le remito el presupuesto solicitado.\n\nQuedamos a su disposición para cualquier duda.\n\nAtentamente,\nEl Equipo Comercial' },
-                { id: 'tpl2', name: 'Seguimiento', subject: 'Seguimiento Presupuesto {{numero}}', body: 'Hola {{cliente}},\n\n¿Ha tenido oportunidad de revisar la propuesta enviada?\n\nSaludos.' }
-            ];
-            saveLocal(KEYS.TEMPLATES, mocks);
-        }
-
+        // Upgrade Logic if needed
         localStorage.setItem(KEYS.INIT, KEYS.INIT);
     }
 
@@ -286,7 +251,8 @@ export const storageService = {
             name: 'Super Administrator',
             role: 'admin',
             passwordHash: adminHash,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            lastPasswordChange: new Date().toISOString() // Seed with current time so it doesn't force rotation immediately
         };
         saveLocal(KEYS.USERS, [adminUser]);
         pushToCloud('users', adminUser);

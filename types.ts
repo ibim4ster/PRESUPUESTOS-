@@ -11,6 +11,7 @@ export interface User {
   name: string;
   role: UserRole;
   createdAt: string;
+  lastPasswordChange?: string; // NEW: Security rotation timestamp
   themePreference?: AppTheme; // New
   monthlyGoal?: number; // New: Gamification
 }
