@@ -119,9 +119,15 @@ export const ProductManager: React.FC = () => {
               const line = lines[i].trim();
               if (!line) continue;
               
-              // Expected format: Reference;Description;Price;Cost;Stock;Category
+              // Expected format: Reference;Description;Price;Cost;Stock;StockMin;Category;System
               const parts = line.split(/[;,]/); // Allow ; or ,
               if (parts.length < 3) continue;
+
+              const rawSystem = parts[7]?.trim().toLowerCase();
+              let system: SystemType | 'both' = 'both';
+              if (['agora', 'sage', 'sage200', 'sagedespachos'].includes(rawSystem)) {
+                  system = rawSystem as SystemType;
+              }
 
               const newProd: Product = {
                   id: crypto.randomUUID(),
@@ -129,10 +135,10 @@ export const ProductManager: React.FC = () => {
                   description: parts[1]?.trim() || 'Sin descripción',
                   price: parseFloat(parts[2]?.replace(',', '.') || '0'),
                   costPrice: parseFloat(parts[3]?.replace(',', '.') || '0'),
-                  stock: parseInt(parts[4] || '0'),
-                  category: parts[5]?.trim() || '',
-                  minStock: 5,
-                  system: 'both' // Default to both
+                  stock: parseInt(parts[4] || '0'), // Default 0 if empty
+                  minStock: parseInt(parts[5] || '5'),
+                  category: parts[6]?.trim() || '',
+                  system: system
               };
               
               storageService.saveProduct(newProd);
@@ -145,8 +151,8 @@ export const ProductManager: React.FC = () => {
   };
 
   const handleDownloadTemplate = () => {
-      const headers = "Referencia;Descripción;Precio;Coste;Stock;Categoría";
-      const example = "REF-001;TPV Táctil 15 Pulgadas;450.00;300.00;10;Hardware";
+      const headers = "Referencia;Descripción;Precio;Coste;Stock;StockMinimo;Categoría;Sistema";
+      const example = "REF-001;TPV Táctil 15 Pulgadas;450.00;300.00;10;2;Hardware;both";
       // Add BOM for Excel compatibility
       const bom = "\uFEFF";
       const csvContent = bom + headers + "\n" + example;
@@ -242,8 +248,8 @@ export const ProductManager: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-            <h2 className="text-2xl font-bold text-primary">Gestor de Catálogo</h2>
-            <p className="text-sm text-slate-500">Administra productos, stock y packs.</p>
+            <h2 className="text-2xl font-bold theme-text-main">Gestor de Catálogo</h2>
+            <p className="text-sm theme-text-muted">Administra productos, stock y packs.</p>
         </div>
         <div className="flex items-center gap-4 flex-wrap md:flex-nowrap">
              {activeTab === 'products' && (
@@ -257,7 +263,7 @@ export const ProductManager: React.FC = () => {
                     />
                     <button 
                         onClick={handleDownloadTemplate}
-                        className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold border border-slate-300 rounded-md text-slate-600 hover:bg-slate-50 transition-colors"
+                        className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold border theme-border rounded-md theme-text-muted hover:bg-[var(--hover-bg)] hover:text-[var(--text-main)] transition-colors"
                         title="Descargar plantilla CSV"
                     >
                         <DownloadIcon /> Plantilla
@@ -270,16 +276,16 @@ export const ProductManager: React.FC = () => {
                     </button>
                  </div>
              )}
-             <div className="flex bg-slate-200 rounded-lg p-1">
+             <div className="flex bg-[var(--hover-bg)] rounded-lg p-1 border theme-border">
                  <button 
                     onClick={() => setActiveTab('products')} 
-                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'products' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-800'}`}
+                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'products' ? 'bg-[var(--bg-card)] shadow theme-text-main' : 'theme-text-muted'}`}
                  >
                     Productos
                  </button>
                  <button 
                     onClick={() => setActiveTab('kits')} 
-                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'kits' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-800'}`}
+                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'kits' ? 'bg-[var(--bg-card)] shadow theme-text-main' : 'theme-text-muted'}`}
                  >
                     Packs
                  </button>
@@ -295,18 +301,18 @@ export const ProductManager: React.FC = () => {
                     <input 
                         type="text" 
                         placeholder="Buscar producto..." 
-                        className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none"
+                        className="w-full pl-9 pr-3 py-2 theme-input border theme-border rounded-lg text-sm focus:ring-2 focus:ring-[var(--accent-color)] outline-none"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
-                    <div className="absolute left-3 top-2.5 text-slate-400">
+                    <div className="absolute left-3 top-2.5 theme-text-muted">
                         <SearchIcon />
                     </div>
                 </div>
 
                 <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
                     <select 
-                        className="bg-white border border-gray-300 rounded-lg text-xs font-bold text-slate-700 p-2 cursor-pointer focus:outline-none"
+                        className="theme-input border theme-border rounded-lg text-xs font-bold p-2 cursor-pointer focus:outline-none"
                         value={categoryFilter}
                         onChange={e => setCategoryFilter(e.target.value)}
                     >
@@ -314,24 +320,24 @@ export const ProductManager: React.FC = () => {
                         {categories.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
 
-                    <div className="flex bg-white rounded-lg border border-gray-200 overflow-hidden text-xs flex-shrink-0">
-                        <button onClick={() => setFilter('all')} className={`px-2 py-1.5 font-bold ${filter === 'all' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Todos</button>
-                        <button onClick={() => setFilter('agora')} className={`px-2 py-1.5 font-bold ${filter === 'agora' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Ágora</button>
-                        <button onClick={() => setFilter('sage')} className={`px-2 py-1.5 font-bold ${filter === 'sage' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-gray-50'}`}>Sage</button>
+                    <div className="flex theme-card rounded-lg border theme-border overflow-hidden text-xs flex-shrink-0">
+                        <button onClick={() => setFilter('all')} className={`px-2 py-1.5 font-bold ${filter === 'all' ? 'bg-[var(--accent-color)] text-white' : 'theme-text-muted hover:bg-[var(--hover-bg)]'}`}>Todos</button>
+                        <button onClick={() => setFilter('agora')} className={`px-2 py-1.5 font-bold ${filter === 'agora' ? 'bg-[var(--accent-color)] text-white' : 'theme-text-muted hover:bg-[var(--hover-bg)]'}`}>Ágora</button>
+                        <button onClick={() => setFilter('sage')} className={`px-2 py-1.5 font-bold ${filter === 'sage' ? 'bg-[var(--accent-color)] text-white' : 'theme-text-muted hover:bg-[var(--hover-bg)]'}`}>Sage</button>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-6">
+            <div className="theme-card p-6 rounded-xl shadow-sm border theme-border flex flex-col md:flex-row gap-6">
                 <div className="flex-1 space-y-4">
-                    <h3 className="text-lg font-medium">{editingId ? 'Editar Producto' : 'Nuevo Producto'}</h3>
+                    <h3 className="text-lg font-medium theme-text-main">{editingId ? 'Editar Producto' : 'Nuevo Producto'}</h3>
                     
                     {/* FIXED: Proper Grid Layout */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1">Referencia</label>
+                            <label className="block text-xs font-bold theme-text-muted mb-1">Referencia</label>
                             <input 
-                                className="w-full border border-gray-300 p-2 rounded bg-white text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none" 
+                                className="w-full border theme-border p-2 rounded theme-input focus:ring-2 focus:ring-[var(--accent-color)] outline-none" 
                                 placeholder="Ej: REF-001" 
                                 value={formData.reference} 
                                 onChange={e => setFormData({...formData, reference: e.target.value})} 
@@ -339,10 +345,10 @@ export const ProductManager: React.FC = () => {
                         </div>
                         
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1 flex items-center gap-1"><TagIcon/> Categoría</label>
+                            <label className="block text-xs font-bold theme-text-muted mb-1 flex items-center gap-1"><TagIcon/> Categoría</label>
                             <div className="relative">
                                 <input 
-                                    className="w-full border border-gray-300 p-2 rounded bg-white text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none" 
+                                    className="w-full border theme-border p-2 rounded theme-input focus:ring-2 focus:ring-[var(--accent-color)] outline-none" 
                                     placeholder="Ej: Hardware" 
                                     value={formData.category || ''} 
                                     onChange={e => setFormData({...formData, category: e.target.value})} 
@@ -355,9 +361,9 @@ export const ProductManager: React.FC = () => {
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1">P. Venta (€)</label>
+                            <label className="block text-xs font-bold theme-text-muted mb-1">P. Venta (€)</label>
                             <input 
-                                className="w-full border border-gray-300 p-2 rounded bg-white text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none" 
+                                className="w-full border theme-border p-2 rounded theme-input focus:ring-2 focus:ring-[var(--accent-color)] outline-none" 
                                 placeholder="0.00" 
                                 type="number" 
                                 step="0.01"
@@ -368,13 +374,13 @@ export const ProductManager: React.FC = () => {
                         
                         <div>
                             <div className="flex justify-between mb-1">
-                                <label className="block text-xs font-bold text-slate-500">P. Coste (€)</label>
+                                <label className="block text-xs font-bold theme-text-muted">P. Coste (€)</label>
                                 <span className={`text-[10px] font-bold px-1.5 rounded ${marginPercent > 30 ? 'bg-green-100 text-green-700' : marginPercent > 0 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
                                     Margen: {isNaN(marginPercent) ? '0.00' : marginPercent.toFixed(2)}%
                                 </span>
                             </div>
                             <input 
-                                className="w-full border border-gray-300 p-2 rounded bg-white text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none" 
+                                className="w-full border theme-border p-2 rounded theme-input focus:ring-2 focus:ring-[var(--accent-color)] outline-none" 
                                 placeholder="0.00" 
                                 type="number" 
                                 step="0.01"
@@ -384,13 +390,13 @@ export const ProductManager: React.FC = () => {
                         </div>
 
                         {/* Stock Section - Full Width in Mobile, Split in Grid */}
-                        <div className="md:col-span-2 grid grid-cols-2 gap-4 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                        <div className="md:col-span-2 grid grid-cols-2 gap-4 bg-blue-50/20 p-3 rounded-lg border border-blue-100/30">
                             <div>
-                                <label className="block text-[10px] font-bold text-blue-800 mb-1 uppercase">Stock Actual</label>
+                                <label className="block text-[10px] font-bold text-blue-500 mb-1 uppercase">Stock Actual</label>
                                 <div className="flex items-center gap-2">
                                     <BoxIcon />
                                     <input 
-                                        className="w-full border border-blue-200 p-1.5 rounded bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none font-bold" 
+                                        className="w-full border theme-border p-1.5 rounded theme-input focus:ring-2 focus:ring-blue-500 outline-none font-bold" 
                                         type="number" 
                                         value={formData.stock || ''} 
                                         onChange={e => setFormData({...formData, stock: parseFloat(e.target.value)})} 
@@ -398,9 +404,9 @@ export const ProductManager: React.FC = () => {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-[10px] font-bold text-blue-800 mb-1 uppercase">Stock Mínimo (Alerta)</label>
+                                <label className="block text-[10px] font-bold text-blue-500 mb-1 uppercase">Stock Mínimo (Alerta)</label>
                                 <input 
-                                    className="w-full border border-blue-200 p-1.5 rounded bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
+                                    className="w-full border theme-border p-1.5 rounded theme-input focus:ring-2 focus:ring-blue-500 outline-none" 
                                     type="number" 
                                     value={formData.minStock || ''} 
                                     onChange={e => setFormData({...formData, minStock: parseFloat(e.target.value)})} 
@@ -409,17 +415,17 @@ export const ProductManager: React.FC = () => {
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="block text-xs font-bold text-slate-500 mb-1">Sistema Asignado</label>
+                            <label className="block text-xs font-bold theme-text-muted mb-1">Sistema Asignado</label>
                             <div className="flex flex-wrap gap-3">
                                 {['both', 'agora', 'sage', 'sage200', 'sagedespachos'].map(sys => (
-                                    <label key={sys} className="flex items-center gap-2 cursor-pointer bg-gray-50 px-2 py-1 rounded border border-gray-200 hover:bg-gray-100">
+                                    <label key={sys} className="flex items-center gap-2 cursor-pointer bg-[var(--bg-main)] px-2 py-1 rounded border theme-border hover:bg-[var(--hover-bg)]">
                                         <input 
                                             type="radio" 
                                             name="system" 
                                             checked={formData.system === sys} 
                                             onChange={() => setFormData({...formData, system: sys as any})} 
                                         />
-                                        <span className="text-xs font-medium">{systemLabels[sys]}</span>
+                                        <span className="text-xs font-medium theme-text-main">{systemLabels[sys]}</span>
                                     </label>
                                 ))}
                             </div>
@@ -427,7 +433,7 @@ export const ProductManager: React.FC = () => {
                     </div>
 
                     <div className="relative">
-                        <label className="block text-xs font-bold text-slate-500 mb-1 flex justify-between">
+                        <label className="block text-xs font-bold theme-text-muted mb-1 flex justify-between">
                             <span>Descripción</span>
                             <button 
                                 onClick={handleAiDescription}
@@ -438,7 +444,7 @@ export const ProductManager: React.FC = () => {
                             </button>
                         </label>
                         <textarea 
-                        className="w-full border border-gray-300 p-2 rounded h-24 bg-white text-slate-900 focus:ring-2 focus:ring-slate-900 outline-none resize-none" 
+                        className="w-full border theme-border p-2 rounded h-24 theme-input focus:ring-2 focus:ring-[var(--accent-color)] outline-none resize-none" 
                         placeholder="Ej: TPV completo con pantalla táctil e impresora..."
                         value={formData.description} 
                         onChange={e => setFormData({...formData, description: e.target.value})} 
@@ -446,25 +452,25 @@ export const ProductManager: React.FC = () => {
                     </div>
                     
                     <div className="flex justify-end space-x-2 pt-2">
-                        {editingId && <button onClick={resetForm} className="px-4 py-2 text-slate-500 hover:text-slate-700">Cancelar</button>}
-                        <button onClick={handleSave} className="bg-slate-900 text-white px-6 py-2 rounded shadow hover:bg-slate-800 font-medium">
+                        {editingId && <button onClick={resetForm} className="px-4 py-2 theme-text-muted hover:text-[var(--text-main)]">Cancelar</button>}
+                        <button onClick={handleSave} className="bg-[var(--accent-color)] text-white px-6 py-2 rounded shadow hover:opacity-90 font-medium">
                         {editingId ? 'Actualizar' : 'Guardar Producto'}
                         </button>
                     </div>
                 </div>
                 
-                <div className="w-full md:w-1/3 flex flex-col items-center justify-start border-2 border-dashed border-gray-200 rounded-lg p-4 bg-gray-50 h-fit mt-10">
+                <div className="w-full md:w-1/3 flex flex-col items-center justify-start border-2 border-dashed theme-border rounded-lg p-4 bg-[var(--bg-main)] h-fit mt-10">
                     {formData.image ? (
                         <img src={formData.image} alt="Preview" className="max-h-40 object-contain mb-4 bg-white p-2 rounded shadow-sm" />
                     ) : (
-                        <div className="text-slate-300 mb-4 text-center">
-                            <div className="w-20 h-20 bg-slate-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                        <div className="theme-text-muted mb-4 text-center">
+                            <div className="w-20 h-20 bg-[var(--bg-card)] rounded-lg flex items-center justify-center mx-auto mb-2 border theme-border">
                                 <ImageIcon />
                             </div>
                             <span className="text-xs">Sin imagen</span>
                         </div>
                     )}
-                    <label className="cursor-pointer bg-white border border-gray-300 text-slate-700 px-4 py-2 rounded text-sm hover:bg-gray-50 hover:text-slate-900 transition-colors shadow-sm">
+                    <label className="cursor-pointer bg-[var(--bg-card)] border theme-border theme-text-main px-4 py-2 rounded text-sm hover:bg-[var(--hover-bg)] transition-colors shadow-sm">
                         Subir Imagen
                         <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                     </label>
@@ -478,7 +484,7 @@ export const ProductManager: React.FC = () => {
                     const isLowStock = currentStock <= minStock;
 
                     return (
-                        <div key={p.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex space-x-4 hover:shadow-md transition-shadow relative group">
+                        <div key={p.id} className="theme-card p-4 rounded-lg shadow-sm border theme-border flex space-x-4 hover:shadow-md transition-shadow relative group">
                             <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
                                 <span className={`text-[10px] uppercase font-bold px-1.5 rounded text-white ${
                                     p.system === 'sage' || p.system?.startsWith('sage') ? 'bg-[#00d061]' : p.system === 'agora' ? 'bg-red-500' : 'bg-slate-400'
@@ -496,26 +502,26 @@ export const ProductManager: React.FC = () => {
                                 )}
                             </div>
                             
-                            <div className="w-16 h-16 bg-slate-50 rounded flex-shrink-0 flex items-center justify-center overflow-hidden border border-slate-100 text-slate-300">
+                            <div className="w-16 h-16 bg-[var(--bg-main)] rounded flex-shrink-0 flex items-center justify-center overflow-hidden border theme-border theme-text-muted">
                             {p.image ? <img src={p.image} className="w-full h-full object-cover" /> : <ImageIcon />}
                             </div>
                             <div className="flex-1 min-w-0 pt-1">
-                            <div className="font-bold text-slate-800 truncate pr-16 text-sm">{p.reference}</div>
-                            <div className="text-xs text-slate-500 truncate" title={p.description}>{p.description}</div>
+                            <div className="font-bold theme-text-main truncate pr-16 text-sm">{p.reference}</div>
+                            <div className="text-xs theme-text-muted truncate" title={p.description}>{p.description}</div>
                             <div className="flex items-center gap-2 mt-1">
-                                <div className="font-mono text-slate-800 font-bold text-sm">{p.price.toFixed(2)} €</div>
-                                {p.category && <span className="text-[9px] bg-slate-100 text-slate-500 px-1 rounded border border-slate-200 flex items-center gap-1"><TagIcon/> {p.category}</span>}
+                                <div className="font-mono theme-text-main font-bold text-sm">{p.price.toFixed(2)} €</div>
+                                {p.category && <span className="text-[9px] bg-[var(--bg-main)] theme-text-muted px-1 rounded border theme-border flex items-center gap-1"><TagIcon/> {p.category}</span>}
                             </div>
                             </div>
                             <div className="flex flex-col space-y-2 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleEdit(p)} className="text-xs bg-slate-100 p-1.5 rounded hover:bg-slate-200 text-slate-600" title="Editar">✏️</button>
+                            <button onClick={() => handleEdit(p)} className="text-xs bg-[var(--bg-main)] p-1.5 rounded hover:bg-[var(--hover-bg)] theme-text-main" title="Editar">✏️</button>
                             <button onClick={() => handleDelete(p.id)} className="text-xs bg-red-50 p-1.5 rounded hover:bg-red-100 text-red-600" title="Borrar">🗑️</button>
                             </div>
                         </div>
                     );
                 })}
                 {filteredProducts.length === 0 && (
-                     <div className="col-span-full text-center py-12 text-slate-400 italic">No se encontraron productos</div>
+                     <div className="col-span-full text-center py-12 theme-text-muted italic">No se encontraron productos</div>
                 )}
             </div>
         </>
@@ -524,52 +530,52 @@ export const ProductManager: React.FC = () => {
       {/* KITS TAB */}
       {activeTab === 'kits' && (
         <div className="space-y-8">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-6">
+            <div className="theme-card p-6 rounded-xl shadow-sm border theme-border flex flex-col gap-6">
                 <div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-1">{editingKitId ? 'Editar Pack' : 'Crear Nuevo Pack'}</h3>
-                    <p className="text-xs text-slate-500">Agrupa varios productos para añadirlos rápidamente a los presupuestos.</p>
+                    <h3 className="text-lg font-bold theme-text-main mb-1">{editingKitId ? 'Editar Pack' : 'Crear Nuevo Pack'}</h3>
+                    <p className="text-xs theme-text-muted">Agrupa varios productos para añadirlos rápidamente a los presupuestos.</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-1 space-y-4">
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1">Nombre del Pack</label>
+                            <label className="block text-xs font-bold theme-text-muted mb-1">Nombre del Pack</label>
                             <input 
-                                className="w-full border border-gray-300 p-2 rounded bg-white text-slate-900 focus:ring-2 focus:ring-accent outline-none" 
+                                className="w-full border theme-border p-2 rounded theme-input focus:ring-2 focus:ring-[var(--accent-color)] outline-none" 
                                 placeholder="Ej: TPV Completo Ágora" 
                                 value={kitFormData.reference} 
                                 onChange={e => setKitFormData({...kitFormData, reference: e.target.value})} 
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1">Descripción</label>
+                            <label className="block text-xs font-bold theme-text-muted mb-1">Descripción</label>
                             <textarea 
-                                className="w-full border border-gray-300 p-2 rounded h-20 bg-white text-slate-900 focus:ring-2 focus:ring-accent outline-none resize-none" 
+                                className="w-full border theme-border p-2 rounded h-20 theme-input focus:ring-2 focus:ring-[var(--accent-color)] outline-none resize-none" 
                                 placeholder="Descripción del pack..." 
                                 value={kitFormData.description} 
                                 onChange={e => setKitFormData({...kitFormData, description: e.target.value})} 
                             />
                         </div>
                         <div>
-                             <label className="block text-xs font-bold text-slate-500 mb-1">Sistema</label>
+                             <label className="block text-xs font-bold theme-text-muted mb-1">Sistema</label>
                              <div className="flex flex-wrap gap-2">
                                 {['both', 'agora', 'sage', 'sage200', 'sagedespachos'].map(sys => (
-                                    <label key={sys} className="flex items-center gap-2 cursor-pointer bg-gray-50 px-2 py-1 rounded border border-gray-200">
+                                    <label key={sys} className="flex items-center gap-2 cursor-pointer bg-[var(--bg-main)] px-2 py-1 rounded border theme-border">
                                         <input 
                                             type="radio" 
                                             name="kitSystem" 
                                             checked={kitFormData.system === sys} 
                                             onChange={() => setKitFormData({...kitFormData, system: sys as any})} 
                                         />
-                                        <span className="text-xs">{systemLabels[sys]}</span>
+                                        <span className="text-xs theme-text-main">{systemLabels[sys]}</span>
                                     </label>
                                 ))}
                              </div>
                         </div>
                     </div>
 
-                    <div className="md:col-span-2 bg-gray-50 rounded-lg p-4 border border-gray-200 flex flex-col">
-                        <label className="block text-xs font-bold text-slate-500 mb-2">Contenido del Pack</label>
+                    <div className="md:col-span-2 bg-[var(--bg-main)] rounded-lg p-4 border theme-border flex flex-col">
+                        <label className="block text-xs font-bold theme-text-muted mb-2">Contenido del Pack</label>
                         
                         <div className="mb-4">
                             <SearchableSelect 
@@ -585,18 +591,18 @@ export const ProductManager: React.FC = () => {
                                 const prod = products.find(p => p.id === item.productId);
                                 if(!prod) return null;
                                 return (
-                                    <div key={idx} className="flex items-center gap-3 bg-white p-2 rounded border border-gray-200">
-                                        <div className="w-8 h-8 rounded bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden text-slate-300">
+                                    <div key={idx} className="flex items-center gap-3 theme-card p-2 rounded border theme-border">
+                                        <div className="w-8 h-8 rounded bg-[var(--bg-main)] border theme-border flex items-center justify-center overflow-hidden theme-text-muted">
                                             {prod.image ? <img src={prod.image} className="w-full h-full object-cover" /> : <ImageIcon />}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="text-xs font-bold truncate">{prod.reference}</div>
-                                            <div className="text-[10px] text-slate-500 truncate">{prod.description}</div>
+                                            <div className="text-xs font-bold truncate theme-text-main">{prod.reference}</div>
+                                            <div className="text-[10px] theme-text-muted truncate">{prod.description}</div>
                                         </div>
                                         <div className="w-16">
                                             <input 
                                                 type="number" min="1" 
-                                                className="w-full text-right text-xs p-1 border border-gray-300 rounded bg-white text-slate-900"
+                                                className="w-full text-right text-xs p-1 border theme-border rounded theme-input"
                                                 value={item.units}
                                                 onChange={(e) => updateKitItemUnits(idx, parseInt(e.target.value) || 1)}
                                             />
@@ -606,24 +612,24 @@ export const ProductManager: React.FC = () => {
                                 )
                             })}
                             {kitFormData.items.length === 0 && (
-                                <div className="text-center text-slate-400 text-xs py-4 italic">Añade productos para formar el pack</div>
+                                <div className="text-center theme-text-muted text-xs py-4 italic">Añade productos para formar el pack</div>
                             )}
                         </div>
 
-                        <div className="mt-4 pt-3 border-t border-gray-200 flex justify-between items-center">
-                            <div className="text-xs text-slate-500">
+                        <div className="mt-4 pt-3 border-t theme-border flex justify-between items-center">
+                            <div className="text-xs theme-text-muted">
                                 <strong>{kitFormData.items.length}</strong> productos
                             </div>
-                            <div className="text-sm font-bold text-slate-800">
+                            <div className="text-sm font-bold theme-text-main">
                                 Total Calculado: {calculateKitPrice(kitFormData.items).toFixed(2)} €
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex justify-end gap-2 border-t pt-4">
-                    {editingKitId && <button onClick={resetKitForm} className="px-4 py-2 text-slate-500 hover:text-slate-700 text-sm font-bold">Cancelar</button>}
-                    <button onClick={handleSaveKit} className="bg-slate-900 text-white px-6 py-2 rounded shadow hover:bg-slate-800 text-sm font-bold">
+                <div className="flex justify-end gap-2 border-t theme-border pt-4">
+                    {editingKitId && <button onClick={resetKitForm} className="px-4 py-2 theme-text-muted hover:text-[var(--text-main)] text-sm font-bold">Cancelar</button>}
+                    <button onClick={handleSaveKit} className="bg-[var(--accent-color)] text-white px-6 py-2 rounded shadow hover:opacity-90 text-sm font-bold">
                         {editingKitId ? 'Actualizar Pack' : 'Guardar Pack'}
                     </button>
                 </div>
@@ -631,11 +637,11 @@ export const ProductManager: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {kits.map(kit => (
-                    <div key={kit.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <div key={kit.id} className="theme-card p-4 rounded-lg shadow-sm border theme-border hover:shadow-md transition-shadow">
                         <div className="flex justify-between items-start mb-2">
                              <div>
-                                 <div className="font-bold text-slate-800">{kit.reference}</div>
-                                 <div className="text-xs text-slate-500">{kit.description}</div>
+                                 <div className="font-bold theme-text-main">{kit.reference}</div>
+                                 <div className="text-xs theme-text-muted">{kit.description}</div>
                              </div>
                              <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded text-white ${
                                  kit.system === 'sage' || kit.system?.startsWith('sage') ? 'bg-[#00d061]' : kit.system === 'agora' ? 'bg-red-500' : 'bg-slate-400'
@@ -643,15 +649,15 @@ export const ProductManager: React.FC = () => {
                                 {kit.system === 'both' ? 'TODOS' : kit.system}
                              </span>
                         </div>
-                        <div className="bg-gray-50 rounded p-2 mb-3 text-xs space-y-1 text-slate-600">
+                        <div className="bg-[var(--bg-main)] rounded p-2 mb-3 text-xs space-y-1 theme-text-muted">
                             {kit.items.slice(0, 3).map((it, i) => {
                                 const p = products.find(prod => prod.id === it.productId);
                                 return p ? <div key={i} className="truncate">• {it.units}x {p.reference}</div> : null;
                             })}
                             {kit.items.length > 3 && <div className="text-slate-400 italic">+ {kit.items.length - 3} más...</div>}
                         </div>
-                        <div className="flex justify-between items-center border-t pt-2">
-                            <div className="font-mono font-bold text-slate-800 text-sm">{calculateKitPrice(kit.items).toFixed(2)} €</div>
+                        <div className="flex justify-between items-center border-t theme-border pt-2">
+                            <div className="font-mono font-bold theme-text-main text-sm">{calculateKitPrice(kit.items).toFixed(2)} €</div>
                             <div className="space-x-2">
                                 <button onClick={() => handleEditKit(kit)} className="text-blue-600 hover:underline text-xs font-bold">Editar</button>
                                 <button onClick={() => handleDeleteKit(kit.id)} className="text-red-500 hover:underline text-xs font-bold">Borrar</button>
