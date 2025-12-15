@@ -112,7 +112,7 @@ export const ExpenseManager: React.FC = () => {
                 {/* CHART */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-64 flex flex-col">
                     <h3 className="font-bold text-slate-800 text-sm mb-2">Desglose por Categoría</h3>
-                    <div className="flex-1 w-full h-full">
+                    <div className="flex-1 w-full h-full" style={{ minHeight: '200px' }}>
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie data={chartData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={5} dataKey="value">

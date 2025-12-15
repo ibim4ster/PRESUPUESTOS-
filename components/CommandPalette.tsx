@@ -95,7 +95,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ onNavigate, onEd
       onEditBudget(item.data);
     } else if (item.type === 'client') {
       onNavigate('clients');
-      // In a real app we'd pass the client ID to auto-open, but simplifying for now
     }
     onClose();
   };

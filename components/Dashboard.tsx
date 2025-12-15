@@ -74,7 +74,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
   useEffect(() => {
     loadData();
     return storageService.subscribe(loadData);
-  }, [currentSystem, currentUser]); 
+    // CRITICAL FIX: Only depend on primitive ID, not the object reference, to prevent infinite loops.
+  }, [currentSystem, currentUser?.id]); 
 
   const loadData = () => {
     const allBudgets = storageService.getBudgets().filter(b => (b.system || 'agora') === currentSystem);
@@ -82,8 +83,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
     setBudgets([...allBudgets]); 
     setLogs(storageService.getLogs().slice(0, 10)); // Get last 10 logs
     
-    if (currentUser) {
-        const myTasks = storageService.getTasks().filter(t => !t.completed && t.assignedTo === currentUser.id);
+    // Refresh user from session to get updated goals
+    const latestUser = authService.getSession();
+    
+    if (latestUser) {
+        const myTasks = storageService.getTasks().filter(t => !t.completed && t.assignedTo === latestUser.id);
         setTasks(myTasks);
     }
 
@@ -106,7 +110,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
       pending: allBudgets.filter(b => b.status === 'pending').length,
       accepted: allBudgets.filter(b => b.status === 'accepted').length,
       recurring: recurringTotal,
-      goal: currentUser?.monthlyGoal || 0
+      goal: latestUser?.monthlyGoal || 0
     });
 
     // Chart Data (Sales Evolution)
@@ -394,7 +398,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
               {/* SALES CHART */}
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[350px]">
                 <h3 className="text-sm font-bold text-slate-600 uppercase mb-4">Evolución de Ventas</h3>
-                <div className="flex-1">
+                <div className="flex-1 min-h-[300px]" style={{ minHeight: '300px' }}>
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={chartData}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -463,7 +467,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onEditBudget, onNewBudget,
               {/* SALES BY CATEGORY PIE CHART */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-[300px] flex flex-col">
                   <h3 className="text-sm font-bold text-slate-800 uppercase mb-2">Ventas por Categoría</h3>
-                  <div className="flex-1 min-h-0">
+                  <div className="flex-1 min-h-0" style={{ minHeight: '200px' }}>
                       {categoryData.length > 0 ? (
                           <ResponsiveContainer width="100%" height="100%">
                               <PieChart>
