@@ -13,6 +13,7 @@ const TagIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height=
 const SparklesIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M9 3v4"/><path d="M3 5h4"/><path d="M3 9h4"/></svg>;
 const UploadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
 const DownloadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
+const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>;
 
 export const ProductManager: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'products' | 'kits'>('products');
@@ -64,7 +65,7 @@ export const ProductManager: React.FC = () => {
 
   const handleAiDescription = async () => {
       if(!formData.description) return alert('Escribe algo básico primero para que la IA pueda mejorarlo.');
-      if(!aiService.isAvailable()) return alert('Error: API KEY no configurada en .env');
+      if(!aiService.isAvailable()) return alert('API Key no disponible.');
       
       setIsAiLoading(true);
       const improved = await aiService.polishDescription(formData.description);
@@ -113,18 +114,15 @@ export const ProductManager: React.FC = () => {
           const lines = text.split('\n');
           let importedCount = 0;
 
-          // Skip header row if present
           const startIndex = lines[0].toLowerCase().includes('referencia') ? 1 : 0;
 
           for (let i = startIndex; i < lines.length; i++) {
               const line = lines[i].trim();
               if (!line) continue;
               
-              // Expected format: Reference;Description;Price;Cost;Stock;StockMin;Category;System
-              const parts = line.split(/[;,]/); // Allow ; or ,
+              const parts = line.split(/[;,]/);
               if (parts.length < 3) continue;
 
-              // Improved System Parsing: Remove spaces and lowercase to handle "Sage Despachos" -> "sagedespachos"
               const rawSystem = parts[7]?.trim().toLowerCase().replace(/\s+/g, '');
               let system: SystemType | 'both' = 'both';
               
@@ -156,7 +154,6 @@ export const ProductManager: React.FC = () => {
   const handleDownloadTemplate = () => {
       const headers = "Referencia;Descripción;Precio;Coste;Stock;StockMinimo;Categoría;Sistema";
       const example = "REF-001;Software Gestión;450.00;300.00;999;0;Software;sagedespachos";
-      // Add BOM for Excel compatibility
       const bom = "\uFEFF";
       const csvContent = bom + headers + "\n" + example;
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -177,7 +174,6 @@ export const ProductManager: React.FC = () => {
     return matchesSystem && matchesSearch && matchesCategory;
   });
 
-  // Calculate Margin
   const marginPercent = formData.price > 0 && formData.costPrice !== undefined
     ? ((formData.price - formData.costPrice) / formData.price) * 100 
     : 0;
@@ -296,7 +292,6 @@ export const ProductManager: React.FC = () => {
         </div>
       </div>
 
-      {/* PRODUCTS TAB */}
       {activeTab === 'products' && (
         <>
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
@@ -334,8 +329,6 @@ export const ProductManager: React.FC = () => {
             <div className="theme-card p-6 rounded-xl shadow-sm border theme-border flex flex-col md:flex-row gap-6">
                 <div className="flex-1 space-y-4">
                     <h3 className="text-lg font-medium theme-text-main">{editingId ? 'Editar Producto' : 'Nuevo Producto'}</h3>
-                    
-                    {/* FIXED: Proper Grid Layout */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold theme-text-muted mb-1">Referencia</label>
@@ -392,7 +385,6 @@ export const ProductManager: React.FC = () => {
                             />
                         </div>
 
-                        {/* Stock Section - Full Width in Mobile, Split in Grid */}
                         <div className="md:col-span-2 grid grid-cols-2 gap-4 bg-blue-50/20 p-3 rounded-lg border border-blue-100/30">
                             <div>
                                 <label className="block text-[10px] font-bold text-blue-500 mb-1 uppercase">Stock Actual</label>
@@ -530,7 +522,6 @@ export const ProductManager: React.FC = () => {
         </>
       )}
 
-      {/* KITS TAB */}
       {activeTab === 'kits' && (
         <div className="space-y-8">
             <div className="theme-card p-6 rounded-xl shadow-sm border theme-border flex flex-col gap-6">
@@ -538,7 +529,6 @@ export const ProductManager: React.FC = () => {
                     <h3 className="text-lg font-bold theme-text-main mb-1">{editingKitId ? 'Editar Pack' : 'Crear Nuevo Pack'}</h3>
                     <p className="text-xs theme-text-muted">Agrupa varios productos para añadirlos rápidamente a los presupuestos.</p>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-1 space-y-4">
                         <div>
@@ -576,10 +566,8 @@ export const ProductManager: React.FC = () => {
                              </div>
                         </div>
                     </div>
-
                     <div className="md:col-span-2 bg-[var(--bg-main)] rounded-lg p-4 border theme-border flex flex-col">
                         <label className="block text-xs font-bold theme-text-muted mb-2">Contenido del Pack</label>
-                        
                         <div className="mb-4">
                             <SearchableSelect 
                                 options={productOptions}
@@ -588,7 +576,6 @@ export const ProductManager: React.FC = () => {
                                 placeholder="+ Añadir Producto al Pack..."
                             />
                         </div>
-
                         <div className="flex-1 overflow-y-auto space-y-2 max-h-60 pr-1 custom-scrollbar">
                             {kitFormData.items.map((item, idx) => {
                                 const prod = products.find(p => p.id === item.productId);
@@ -618,7 +605,6 @@ export const ProductManager: React.FC = () => {
                                 <div className="text-center theme-text-muted text-xs py-4 italic">Añade productos para formar el pack</div>
                             )}
                         </div>
-
                         <div className="mt-4 pt-3 border-t theme-border flex justify-between items-center">
                             <div className="text-xs theme-text-muted">
                                 <strong>{kitFormData.items.length}</strong> productos
@@ -629,7 +615,6 @@ export const ProductManager: React.FC = () => {
                         </div>
                     </div>
                 </div>
-
                 <div className="flex justify-end gap-2 border-t theme-border pt-4">
                     {editingKitId && <button onClick={resetKitForm} className="px-4 py-2 theme-text-muted hover:text-[var(--text-main)] text-sm font-bold">Cancelar</button>}
                     <button onClick={handleSaveKit} className="bg-[var(--accent-color)] text-white px-6 py-2 rounded shadow hover:opacity-90 text-sm font-bold">
@@ -637,7 +622,6 @@ export const ProductManager: React.FC = () => {
                     </button>
                 </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {kits.map(kit => (
                     <div key={kit.id} className="theme-card p-4 rounded-lg shadow-sm border theme-border hover:shadow-md transition-shadow">
