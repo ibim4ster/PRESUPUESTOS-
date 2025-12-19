@@ -26,34 +26,54 @@ export const AdminPanel: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  useEffect(() => { loadData(); return storageService.subscribe(loadData); }, []);
-  const loadData = () => { setUsers(storageService.getUsers()); setLogs(storageService.getLogs()); };
+  useEffect(() => {
+    loadData();
+    const unsub = storageService.subscribe(loadData);
+    return unsub;
+  }, []);
+
+  const loadData = () => {
+    setUsers(storageService.getUsers());
+    setLogs(storageService.getLogs());
+  };
+
   const getInitials = (name: string) => name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.username || !formData.name || !formData.password) return alert('Datos obligatorios');
-    if (users.some(u => u.username.toLowerCase() === formData.username.toLowerCase())) return alert('Usuario ya existe.');
+    if (!formData.username || !formData.name || !formData.password) return alert('Todos los campos son obligatorios');
+    if (users.some(u => u.username.toLowerCase() === formData.username.toLowerCase())) { return alert('El nombre de usuario ya existe.'); }
     const hash = await authService.hashPassword(formData.password);
-    const newUser: User = { id: crypto.randomUUID(), username: formData.username, name: formData.name, role: formData.role, passwordHash: hash, createdAt: new Date().toISOString(), lastPasswordChange: new Date().toISOString() };
+    const newUser: User = { 
+        id: crypto.randomUUID(), 
+        username: formData.username, 
+        name: formData.name, 
+        role: formData.role, 
+        passwordHash: hash, 
+        createdAt: new Date().toISOString(),
+        lastPasswordChange: new Date().toISOString() // Set current time for new users
+    };
     storageService.saveUser(newUser);
-    storageService.addLog({ userId: currentUser?.id, userName: currentUser?.name, action: 'USER_CREATED', details: `User ${newUser.username}` });
+    storageService.addLog({ userId: currentUser?.id, userName: currentUser?.name, action: 'USER_CREATED', details: `Created user ${newUser.username}` });
     setFormData({ username: '', name: '', password: '', role: 'commercial' });
-    alert('Usuario creado');
+    alert('Usuario creado correctamente');
   };
 
   const handleUpdateUser = () => {
       if (!editingUser) return;
+      const existing = users.find(u => u.username.toLowerCase() === editingUser.username.toLowerCase() && u.id !== editingUser.id);
+      if (existing) return alert('El nombre de usuario ya está en uso por otra persona.');
       storageService.saveUser(editingUser);
-      storageService.addLog({ userId: currentUser?.id, userName: currentUser?.name, action: 'USER_UPDATED', details: editingUser.username });
+      storageService.addLog({ userId: currentUser?.id, userName: currentUser?.name, action: 'USER_UPDATED', details: `Updated user ${editingUser.username}` });
       setEditingUser(null);
+      alert('Datos actualizados correctamente.');
   };
 
   const handleDeleteUser = (userId: string) => {
-    if (userId === currentUser?.id) return alert('No puedes borrarte a ti mismo.');
-    if (confirm('¿Eliminar usuario?')) {
+    if (userId === currentUser?.id) return alert('No puedes borrar tu propio usuario.');
+    if (confirm('¿Estás seguro de eliminar este usuario? Esta acción no se puede deshacer.')) {
         storageService.deleteUser(userId);
-        storageService.addLog({ userId: currentUser?.id, userName: currentUser?.name, action: 'USER_DELETED', details: userId });
+        storageService.addLog({ userId: currentUser?.id, userName: currentUser?.name, action: 'USER_DELETED', details: `Deleted user ID ${userId}` });
     }
   };
 
@@ -62,45 +82,70 @@ export const AdminPanel: React.FC = () => {
       const user = users.find(u => u.id === resetUserId);
       if (!user) return;
       const hash = await authService.hashPassword(newPassword);
-      storageService.saveUser({ ...user, passwordHash: hash, lastPasswordChange: new Date().toISOString() });
-      storageService.addLog({ userId: currentUser?.id, userName: currentUser?.name, action: 'PASS_RESET', details: user.username });
+      
+      const updatedUser = { 
+          ...user, 
+          passwordHash: hash,
+          lastPasswordChange: new Date().toISOString() // Reset timer
+      };
+      
+      storageService.saveUser(updatedUser);
+      storageService.addLog({ userId: currentUser?.id, userName: currentUser?.name, action: 'USER_PASS_RESET', details: `Reset password for ${user.username}` });
       setResetUserId(null); setNewPassword('');
-      alert('Password actualizado.');
+      alert('Contraseña actualizada correctamente.');
   };
 
   const filteredUsers = users.filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.username.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
-    <div className="space-y-8 pb-12 theme-text-main">
+    <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-         <div><h2 className="text-2xl font-bold">Panel de Control</h2><p className="theme-text-muted text-sm">Administración central de seguridad y acceso.</p></div>
-         <span className="bg-red-500/10 text-red-500 text-[10px] font-black px-3 py-1 rounded-full uppercase flex items-center gap-2 self-start md:self-auto border border-red-500/20"><span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span> Root Access Only</span>
+         <div>
+            <h2 className="text-2xl font-bold theme-text-main">Panel de Administración</h2>
+            <p className="theme-text-muted text-sm">Gestión de usuarios, permisos y seguridad.</p>
+         </div>
+         <span className="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full uppercase flex items-center gap-2 self-start md:self-auto"><span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span> Acceso Restringido</span>
       </div>
 
-      <div className="flex theme-bg-main rounded-xl p-1 border theme-border w-fit">
-          <button onClick={() => setActiveTab('users')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'users' ? 'theme-bg-card shadow-sm theme-text-main' : 'theme-text-muted hover:theme-text-main'}`}><UsersIcon /> Usuarios</button>
-          <button onClick={() => setActiveTab('logs')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'logs' ? 'theme-bg-card shadow-sm theme-text-main' : 'theme-text-muted hover:theme-text-main'}`}><ActivityIcon /> Auditoría</button>
+      <div className="flex theme-card rounded-lg p-1 border theme-border w-fit">
+          <button onClick={() => setActiveTab('users')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'users' ? 'bg-[var(--accent-color)] text-white shadow' : 'theme-text-muted hover:text-[var(--text-main)]'}`}><UsersIcon /> Usuarios</button>
+          <button onClick={() => setActiveTab('logs')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'logs' ? 'bg-[var(--accent-color)] text-white shadow' : 'theme-text-muted hover:text-[var(--text-main)]'}`}><ActivityIcon /> Auditoría / Logs</button>
       </div>
 
-      {activeTab === 'users' ? (
+      {activeTab === 'users' && (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
             <div className="xl:col-span-2 space-y-4">
-                <div className="theme-card rounded-2xl shadow-sm border theme-border overflow-hidden">
-                    <div className="px-6 py-4 border-b theme-border theme-bg-table-header flex flex-col sm:flex-row justify-between items-center gap-4">
-                        <h3 className="font-bold flex items-center gap-2">Equipo Registrado <span className="theme-bg-main px-2 py-0.5 rounded text-[10px] theme-text-muted">{users.length}</span></h3>
-                        <div className="relative w-full sm:w-64"><input type="text" placeholder="Buscar..." className="w-full pl-9 pr-3 py-2 theme-input border theme-border rounded-xl text-xs outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /><div className="absolute left-3 top-2.5 theme-text-muted"><SearchIcon /></div></div>
+                <div className="theme-card rounded-xl shadow-sm border theme-border overflow-hidden">
+                    <div className="px-6 py-4 border-b theme-border bg-[var(--bg-main)] flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <h3 className="font-bold theme-text-main flex items-center gap-2">Usuarios del Sistema <span className="text-xs font-bold bg-[var(--bg-card)] px-2 py-0.5 rounded border theme-border theme-text-muted">{users.length}</span></h3>
+                        <div className="relative w-full sm:w-64">
+                            <input type="text" placeholder="Buscar usuario..." className="w-full pl-9 pr-3 py-2 theme-input border theme-border rounded-lg text-sm focus:ring-2 focus:ring-[var(--accent-color)] outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                            <div className="absolute left-3 top-2.5 theme-text-muted"><SearchIcon /></div>
+                        </div>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                            <thead className="text-[10px] theme-text-muted uppercase theme-bg-table-header font-black border-b theme-border">
-                                <tr><th className="px-6 py-4">Empleado</th><th className="px-6 py-4">Permisos</th><th className="px-6 py-4 text-right">Acciones</th></tr>
+                            <thead className="text-xs theme-text-muted uppercase bg-[var(--bg-main)] border-b theme-border">
+                                <tr><th className="px-6 py-3">Usuario</th><th className="px-6 py-3">Rol / Permisos</th><th className="px-6 py-3">Alta</th><th className="px-6 py-3 text-right">Acciones</th></tr>
                             </thead>
                             <tbody className="divide-y theme-border">
-                                {filteredUsers.map(u => (
-                                    <tr key={u.id} className="hover:theme-bg-main transition-colors">
-                                        <td className="px-6 py-4"><div className="flex items-center gap-3"><div className="w-9 h-9 rounded-full theme-bg-main border theme-border flex items-center justify-center theme-text-muted font-black text-xs">{getInitials(u.name)}</div><div><div className="font-bold theme-text-main">{u.name}</div><div className="text-[10px] theme-text-muted">@{u.username}</div></div></div></td>
-                                        <td className="px-6 py-4">{u.role === 'admin' ? (<span className="bg-red-500/10 text-red-500 px-2 py-0.5 rounded text-[10px] font-black uppercase border border-red-500/20">Admin</span>) : (<span className="bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded text-[10px] font-black uppercase border border-blue-500/20">Comercial</span>)}</td>
-                                        <td className="px-6 py-4 text-right"><div className="flex justify-end gap-2"><button onClick={() => setEditingUser(u)} className="p-2 theme-text-muted hover:theme-text-main"><EditIcon /></button><button onClick={() => setResetUserId(u.id)} className="p-2 theme-text-muted hover:text-orange-500"><KeyIcon /></button>{u.id !== currentUser?.id && (<button onClick={() => handleDeleteUser(u.id)} className="p-2 theme-text-muted hover:text-red-500"><TrashIcon /></button>)}</div></td>
+                                {filteredUsers.map(user => (
+                                    <tr key={user.id} className="hover:bg-[var(--hover-bg)] transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-full bg-[var(--bg-main)] border theme-border flex items-center justify-center theme-text-muted font-bold text-xs">{getInitials(user.name)}</div>
+                                                <div><div className="font-bold theme-text-main">{user.name}</div><div className="text-xs theme-text-muted">@{user.username}</div></div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">{user.role === 'admin' ? (<span className="inline-flex items-center gap-1.5 bg-red-50 text-red-700 px-2.5 py-1 rounded-full text-xs font-bold border border-red-100">Administrador</span>) : (<span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full text-xs font-bold border border-blue-100">Comercial</span>)}</td>
+                                        <td className="px-6 py-4 theme-text-muted text-xs font-mono">{new Date(user.createdAt).toLocaleDateString()}</td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex justify-end items-center gap-2">
+                                                <button onClick={() => setEditingUser(user)} className="p-2 theme-text-muted hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><EditIcon /></button>
+                                                <button onClick={() => setResetUserId(user.id)} className="p-2 theme-text-muted hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"><KeyIcon /></button>
+                                                {user.id !== currentUser?.id && (<button onClick={() => handleDeleteUser(user.id)} className="p-2 theme-text-muted hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><TrashIcon /></button>)}
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -108,10 +153,76 @@ export const AdminPanel: React.FC = () => {
                     </div>
                 </div>
             </div>
-            <div className="theme-card p-6 rounded-2xl shadow-sm border theme-border h-fit"><h3 className="font-bold mb-6 flex items-center gap-2 pb-4 border-b theme-border"><UserPlusIcon /> Nuevo Perfil</h3><form onSubmit={handleCreateUser} className="space-y-4"><div><label className="block text-[10px] font-black uppercase theme-text-muted mb-1.5 ml-1">Nombre Real</label><input className="w-full theme-input border theme-border rounded-xl p-2.5 text-sm" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div><div><label className="block text-[10px] font-black uppercase theme-text-muted mb-1.5 ml-1">Login ID</label><input className="w-full theme-input border theme-border rounded-xl p-2.5 text-sm" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} /></div><div><label className="block text-[10px] font-black uppercase theme-text-muted mb-1.5 ml-1">Password</label><input type="password" className="w-full theme-input border theme-border rounded-xl p-2.5 text-sm" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} /></div><button type="submit" className="w-full bg-slate-900 text-white font-black py-3 rounded-xl shadow-lg mt-4 text-sm">REGISTRAR USUARIO</button></form></div>
+
+            <div className="space-y-4">
+                <div className="theme-card p-6 rounded-xl shadow-sm border theme-border sticky top-24">
+                    <h3 className="font-bold theme-text-main mb-6 flex items-center gap-2 pb-4 border-b theme-border"><UserPlusIcon /> Crear Nuevo Usuario</h3>
+                    <form onSubmit={handleCreateUser} className="space-y-5">
+                        <div><label className="block text-xs font-bold uppercase theme-text-muted mb-1.5">Nombre Completo</label><input className="w-full theme-input border theme-border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-[var(--accent-color)] outline-none" placeholder="Ej: Juan Pérez" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+                        <div><label className="block text-xs font-bold uppercase theme-text-muted mb-1.5">Usuario (Login)</label><input className="w-full theme-input border theme-border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-[var(--accent-color)] outline-none" placeholder="Ej: jperez" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} autoComplete="off" /></div>
+                        <div><label className="block text-xs font-bold uppercase theme-text-muted mb-1.5">Contraseña Inicial</label><input type="password" className="w-full theme-input border theme-border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-[var(--accent-color)] outline-none" placeholder="••••••" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} autoComplete="new-password" /></div>
+                        <div><label className="block text-xs font-bold uppercase theme-text-muted mb-1.5">Rol / Permisos</label><select className="w-full theme-input border theme-border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-[var(--accent-color)] outline-none cursor-pointer" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value as UserRole})}><option value="commercial">Comercial (Ver sus ventas)</option><option value="admin">Administrador (Acceso Total)</option></select></div>
+                        <button type="submit" className="w-full bg-[var(--accent-color)] text-white font-bold py-3 rounded-lg hover:opacity-90 transition-colors shadow-lg mt-4 flex justify-center items-center gap-2"><UserPlusIcon /> Crear Usuario</button>
+                    </form>
+                </div>
+            </div>
         </div>
-      ) : (
-          <div className="theme-card rounded-2xl shadow-sm border theme-border overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-xs text-left"><thead className="theme-bg-table-header theme-text-muted uppercase border-b theme-border font-black"><tr><th className="px-6 py-3">Timestamp</th><th className="px-6 py-3">Actor</th><th className="px-6 py-3">Evento</th><th className="px-6 py-3">Detalle</th></tr></thead><tbody className="divide-y theme-border">{logs.map(l => (<tr key={l.id} className="hover:theme-bg-main"><td className="px-6 py-3 theme-text-muted font-mono">{new Date(l.timestamp).toLocaleString()}</td><td className="px-6 py-3 font-bold">{l.userName}</td><td className="px-6 py-3"><span className="font-black opacity-70">{l.action}</span></td><td className="px-6 py-3 theme-text-muted truncate max-w-xs">{l.details}</td></tr>))}</tbody></table></div></div>
+      )}
+
+      {activeTab === 'logs' && (
+          <div className="theme-card rounded-xl shadow-sm border theme-border overflow-hidden animate-in fade-in duration-300">
+             <div className="px-6 py-4 border-b theme-border bg-[var(--bg-main)] flex items-center justify-between"><h3 className="font-bold theme-text-main flex items-center gap-2">Registro de Auditoría</h3></div>
+             <div className="overflow-x-auto">
+                 <table className="w-full text-sm text-left">
+                    <thead className="text-xs theme-text-muted uppercase bg-[var(--bg-main)] border-b theme-border"><tr><th className="px-6 py-3">Fecha / Hora</th><th className="px-6 py-3">Usuario</th><th className="px-6 py-3">Acción</th><th className="px-6 py-3">Detalle</th></tr></thead>
+                    <tbody className="divide-y theme-border">
+                        {logs.map(log => (
+                            <tr key={log.id} className="hover:bg-[var(--hover-bg)]">
+                                <td className="px-6 py-3 text-xs font-mono theme-text-muted whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
+                                <td className="px-6 py-3 font-medium theme-text-main">{log.userName}</td>
+                                <td className="px-6 py-3"><span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${log.action.includes('LOGIN') ? 'bg-green-100 text-green-800' : log.action.includes('DELETE') ? 'bg-red-100 text-red-800' : log.action.includes('CREATE') ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>{log.action}</span></td>
+                                <td className="px-6 py-3 theme-text-muted truncate max-w-md" title={log.details}>{log.details}</td>
+                            </tr>
+                        ))}
+                        {logs.length === 0 && (<tr><td colSpan={4} className="p-8 text-center theme-text-muted italic">No hay registros de actividad.</td></tr>)}
+                    </tbody>
+                 </table>
+             </div>
+          </div>
+      )}
+
+      {editingUser && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="theme-card rounded-xl shadow-2xl p-6 w-full max-w-md animate-in zoom-in-95 duration-200 border theme-border">
+                <div className="flex justify-between items-center mb-6"><h3 className="font-bold text-lg theme-text-main">Editar Usuario</h3><button onClick={() => setEditingUser(null)} className="theme-text-muted hover:text-[var(--text-main)]"><XIcon /></button></div>
+                <div className="space-y-4">
+                    <div><label className="block text-xs font-bold uppercase theme-text-muted mb-1">Nombre</label><input className="w-full theme-input border theme-border rounded-lg p-2.5 focus:ring-2 focus:ring-[var(--accent-color)] outline-none" value={editingUser.name} onChange={e => setEditingUser({...editingUser, name: e.target.value})} /></div>
+                    <div><label className="block text-xs font-bold uppercase theme-text-muted mb-1">Usuario (Login)</label><input className="w-full theme-input border theme-border rounded-lg p-2.5 focus:ring-2 focus:ring-[var(--accent-color)] outline-none" value={editingUser.username} onChange={e => setEditingUser({...editingUser, username: e.target.value})} /></div>
+                    <div>
+                        <label className="block text-xs font-bold uppercase theme-text-muted mb-1">Permisos (Rol)</label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <label className={`cursor-pointer border rounded-lg p-3 flex flex-col items-center justify-center gap-2 transition-all ${editingUser.role === 'commercial' ? 'bg-blue-50 border-blue-200 ring-2 ring-blue-500' : 'bg-[var(--bg-main)] border theme-border'}`}><input type="radio" className="sr-only" checked={editingUser.role === 'commercial'} onChange={() => setEditingUser({...editingUser, role: 'commercial'})} /><span className="text-sm font-bold theme-text-main">Comercial</span></label>
+                            <label className={`cursor-pointer border rounded-lg p-3 flex flex-col items-center justify-center gap-2 transition-all ${editingUser.role === 'admin' ? 'bg-red-50 border-red-200 ring-2 ring-red-500' : 'bg-[var(--bg-main)] border theme-border'}`}><input type="radio" className="sr-only" checked={editingUser.role === 'admin'} onChange={() => setEditingUser({...editingUser, role: 'admin'})} /><span className="text-sm font-bold theme-text-main">Admin</span></label>
+                        </div>
+                    </div>
+                </div>
+                <div className="mt-8 flex gap-3">
+                    <button onClick={() => setEditingUser(null)} className="flex-1 py-2.5 theme-text-muted font-bold hover:bg-[var(--hover-bg)] rounded-lg transition-colors">Cancelar</button>
+                    <button onClick={handleUpdateUser} className="flex-1 py-2.5 bg-[var(--accent-color)] text-white font-bold rounded-lg hover:opacity-90 transition-colors shadow-lg">Guardar Cambios</button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {resetUserId && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="theme-card rounded-xl shadow-2xl p-6 w-full max-w-sm animate-in zoom-in-95 duration-200 border-t-4 border-orange-500">
+                  <div className="flex items-center gap-3 mb-4"><div className="bg-orange-100 p-2 rounded-full text-orange-600"><KeyIcon /></div><h3 className="font-bold text-lg theme-text-main">Resetear Contraseña</h3></div>
+                  <p className="text-sm theme-text-muted mb-5 leading-relaxed">Estás a punto de cambiar la contraseña. Asegúrate de comunicársela al usuario.</p>
+                  <input type="text" className="w-full theme-input border theme-border rounded-lg p-3 mb-6 focus:ring-2 focus:ring-orange-500 outline-none font-medium" placeholder="Escribe la nueva contraseña" value={newPassword} onChange={e => setNewPassword(e.target.value)} autoFocus />
+                  <div className="flex justify-end gap-2"><button onClick={() => { setResetUserId(null); setNewPassword(''); }} className="px-4 py-2 theme-text-muted hover:text-[var(--text-main)] text-sm font-bold">Cancelar</button><button onClick={handleResetPassword} className="px-6 py-2 bg-orange-600 text-white rounded-lg text-sm font-bold hover:bg-orange-700 shadow-md transition-colors">Actualizar Pass</button></div>
+              </div>
+          </div>
       )}
     </div>
   );
