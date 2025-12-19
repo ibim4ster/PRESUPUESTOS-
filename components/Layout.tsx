@@ -33,16 +33,18 @@ const NavItem = ({ id, label, icon: Icon, active, onClick, collapsed, highlight 
   <button
     onClick={() => onClick(id)}
     title={collapsed ? label : ''}
-    className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${collapsed ? 'justify-center w-full px-2' : 'w-full'} ${
+    className={`flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-all duration-300 group ${collapsed ? 'justify-center w-full px-2' : 'w-full'} ${
       active 
-        ? 'bg-white/10 text-white shadow-sm' 
+        ? 'bg-white/15 text-white shadow-[0_4px_12px_rgba(0,0,0,0.1)] backdrop-blur-md' 
         : highlight 
-            ? 'text-red-300 hover:bg-white/5 hover:text-white'
-            : 'text-white/60 hover:bg-white/5 hover:text-white'
+            ? 'text-red-400 hover:bg-white/5 hover:text-white'
+            : 'text-slate-400 hover:bg-white/5 hover:text-white'
     }`}
   >
-    <Icon />
-    {!collapsed && <span className="font-medium text-sm whitespace-nowrap overflow-hidden transition-all duration-300">{label}</span>}
+    <div className={`transition-transform duration-300 ${active ? 'scale-110' : 'group-hover:scale-105'}`}>
+        <Icon />
+    </div>
+    {!collapsed && <span className="font-semibold text-sm whitespace-nowrap overflow-hidden transition-all duration-300">{label}</span>}
   </button>
 );
 
@@ -55,42 +57,41 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate
     setIsMobileMenuOpen(false);
   };
 
-  // --- ROBUST THEMING ENGINE ---
   const theme = user.themePreference || 'classic';
 
   const themeStyles = {
       classic: {
-          '--bg-sidebar': '#0f172a', // Slate 900
-          '--bg-main': '#f8fafc', // Slate 50
-          '--bg-card': '#ffffff', // White
-          '--text-main': '#0f172a', // Slate 900
-          '--text-muted': '#64748b', // Slate 500
-          '--border-color': '#e2e8f0', // Slate 200
-          '--accent-color': '#dc2626', // Red 600
+          '--bg-sidebar': '#000000', // NEGRO PURO
+          '--bg-main': '#f8fafc',
+          '--bg-card': '#ffffff',
+          '--text-main': '#0f172a',
+          '--text-muted': '#64748b',
+          '--border-color': '#e2e8f0',
+          '--accent-color': '#dc2626',
           '--logo-bg': '#dc2626',
           '--hover-bg': '#f1f5f9',
           '--input-bg': '#ffffff',
       },
       midnight: {
-          '--bg-sidebar': '#000000', // Black
-          '--bg-main': '#0f172a', // Slate 950
-          '--bg-card': '#1e293b', // Slate 800
-          '--text-main': '#f8fafc', // Slate 50
-          '--text-muted': '#94a3b8', // Slate 400
-          '--border-color': '#334155', // Slate 700
-          '--accent-color': '#7c3aed', // Violet 600
+          '--bg-sidebar': '#000000', // NEGRO PURO
+          '--bg-main': '#0f172a',
+          '--bg-card': '#1e293b',
+          '--text-main': '#f8fafc',
+          '--text-muted': '#94a3b8',
+          '--border-color': '#334155',
+          '--accent-color': '#7c3aed',
           '--logo-bg': '#7c3aed',
-          '--hover-bg': '#334155', // Slate 700
+          '--hover-bg': '#334155',
           '--input-bg': '#0f172a',
       },
       ocean: {
-          '--bg-sidebar': '#164e63', // Cyan 900
-          '--bg-main': '#ecfeff', // Cyan 50
-          '--bg-card': '#ffffff', // White
-          '--text-main': '#164e63', // Cyan 900
-          '--text-muted': '#64748b', // Slate 500
-          '--border-color': '#cffafe', // Cyan 100
-          '--accent-color': '#0891b2', // Cyan 600
+          '--bg-sidebar': '#000000', // NEGRO PURO
+          '--bg-main': '#ecfeff',
+          '--bg-card': '#ffffff',
+          '--text-main': '#164e63',
+          '--text-muted': '#64748b',
+          '--border-color': '#cffafe',
+          '--accent-color': '#0891b2',
           '--logo-bg': '#0891b2',
           '--hover-bg': '#e0f2fe',
           '--input-bg': '#ffffff',
@@ -122,122 +123,103 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onNavigate
         .theme-border { border-color: var(--border-color); }
         .theme-input { background-color: var(--input-bg); color: var(--text-main); border-color: var(--border-color); }
         .theme-hover:hover { background-color: var(--hover-bg); }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
       `}</style>
       
-      {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[var(--bg-sidebar)] text-white z-30 flex items-center justify-between px-4 shadow-md">
-        <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[var(--logo-bg)] rounded-lg flex items-center justify-center text-white text-lg font-bold">G</div>
-            <span className="font-bold text-lg">Gravity</span>
-        </div>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2">
-           {isMobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
-        </button>
-      </div>
-
-      {/* Sidebar Overlay */}
-      {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-
       {/* Sidebar */}
       <aside className={`
-        fixed lg:static inset-y-0 left-0 bg-[var(--bg-sidebar)] text-white flex flex-col flex-shrink-0 shadow-2xl z-40 transition-all duration-300 ease-in-out
+        fixed lg:static inset-y-0 left-0 bg-[var(--bg-sidebar)] text-white flex flex-col flex-shrink-0 z-40 transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)
         ${isMobileMenuOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0'}
         ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}
+        border-r border-white/5
       `}>
-        <div className={`p-6 border-b border-white/10 flex flex-col ${isCollapsed ? 'items-center px-2' : ''}`}>
-          <div className="flex justify-between items-start w-full">
+        <div className={`p-6 flex flex-col ${isCollapsed ? 'items-center px-2' : ''}`}>
+          <div className="flex justify-between items-center w-full mb-8">
               {!isCollapsed && (
-                  <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2 animate-in fade-in duration-300">
-                    <div className="w-8 h-8 bg-[var(--logo-bg)] rounded-lg flex items-center justify-center text-white text-lg shadow-lg">G</div>
-                    <span>Gravity</span>
+                  <h1 className="text-xl font-black tracking-tighter text-white flex items-center gap-2">
+                    <div className="w-9 h-9 bg-[var(--logo-bg)] rounded-xl flex items-center justify-center text-white text-lg shadow-[0_0_20px_rgba(220,38,38,0.3)]">G</div>
+                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">Gravity</span>
                   </h1>
               )}
               {isCollapsed && (
-                  <div className="w-8 h-8 bg-[var(--logo-bg)] rounded-lg flex items-center justify-center text-white text-lg shadow-lg mx-auto">G</div>
+                  <div className="w-9 h-9 bg-[var(--logo-bg)] rounded-xl flex items-center justify-center text-white text-lg shadow-[0_0_20px_rgba(220,38,38,0.3)]">G</div>
               )}
-              {!isCollapsed && <span className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded text-white/60 font-mono">v2.4</span>}
           </div>
           
-          <div className={`mt-4 flex items-center gap-2 bg-white/5 p-2 rounded-lg border border-white/10 transition-all duration-300 ${isCollapsed ? 'justify-center w-full' : ''}`}>
-             <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-                 {user.name.charAt(0).toUpperCase()}
-             </div>
-             {!isCollapsed && (
-                 <div className="overflow-hidden">
-                     <div className="text-xs font-bold truncate">{user.name}</div>
-                     <div className="text-[10px] text-white/50 capitalize">{user.role === 'admin' ? 'Administrador' : 'Comercial'}</div>
-                 </div>
-             )}
-          </div>
-
-          {/* System Switcher */}
+          {/* User Profile Mini */}
           {!isCollapsed && (
-              <div className="mt-4 w-full animate-in fade-in duration-300">
-                 <label className="text-[10px] uppercase font-bold text-white/40 mb-1 block">Sistema Activo</label>
-                 <div className="relative">
+              <div className="mb-6 flex items-center gap-3 bg-white/5 p-3 rounded-2xl border border-white/5 transition-all hover:bg-white/10 group cursor-pointer">
+                 <div className="w-9 h-9 bg-gradient-to-br from-slate-700 to-slate-900 rounded-xl flex items-center justify-center text-xs font-black text-white flex-shrink-0 border border-white/10 group-hover:scale-105 transition-transform">
+                     {user.name.charAt(0).toUpperCase()}
+                 </div>
+                 <div className="overflow-hidden">
+                     <div className="text-sm font-bold truncate text-white">{user.name}</div>
+                     <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{user.role === 'admin' ? 'Admin' : 'Sales'}</div>
+                 </div>
+              </div>
+          )}
+
+          {/* System Switcher Premium */}
+          {!isCollapsed && (
+              <div className="mb-6 w-full">
+                 <label className="text-[10px] uppercase font-black text-slate-500 mb-2 block tracking-widest px-1">Active System</label>
+                 <div className="relative group">
                     <select 
                         value={currentSystem}
                         onChange={(e) => onSystemChange(e.target.value as SystemType)}
-                        className="w-full bg-white/10 border border-white/20 rounded-lg p-2.5 text-sm font-bold text-white appearance-none cursor-pointer hover:bg-white/20 transition-colors focus:ring-2 focus:ring-white/30 outline-none"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs font-black text-slate-300 appearance-none cursor-pointer hover:bg-white/10 transition-all focus:ring-2 focus:ring-white/10 outline-none uppercase tracking-tighter"
                     >
-                        <option value="agora" className="text-slate-900 font-bold">ÁGORA</option>
-                        <option value="sage" className="text-slate-900 font-bold">SAGE 50</option>
-                        <option value="sage200" className="text-slate-900 font-bold">SAGE 200</option>
-                        <option value="sagedespachos" className="text-slate-900 font-bold">SAGE DESPACHOS</option>
+                        <option value="agora" className="bg-[#0f0f0f] text-white">ÁGORA RETAIL</option>
+                        <option value="sage" className="bg-[#0f0f0f] text-white">SAGE 50 CLOUD</option>
+                        <option value="sage200" className="bg-[#0f0f0f] text-white">SAGE 200 ADV</option>
+                        <option value="sagedespachos" className="bg-[#0f0f0f] text-white">SAGE DESPACHOS</option>
                     </select>
-                    <div className="absolute right-3 top-3 pointer-events-none text-white/70">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
+                    <div className="absolute right-3 top-3.5 pointer-events-none text-slate-600">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M6 9l6 6 6-6"/></svg>
                     </div>
                  </div>
               </div>
           )}
         </div>
         
-        <nav className="flex-1 p-2 md:p-4 space-y-2 overflow-y-auto mt-16 lg:mt-0 custom-scrollbar">
+        <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto custom-scrollbar">
           <NavItem id="dashboard" label="Dashboard" icon={ChartIcon} active={activeView === 'dashboard'} onClick={handleNavClick} collapsed={isCollapsed} />
           <NavItem id="budgets" label="Nuevo Presupuesto" icon={FilePlusIcon} active={activeView === 'budgets' || activeView === 'edit-budget'} onClick={handleNavClick} collapsed={isCollapsed} />
           <NavItem id="expenses" label="Gastos" icon={CreditCardIcon} active={activeView === 'expenses'} onClick={handleNavClick} collapsed={isCollapsed} />
           <NavItem id="calendar" label="Calendario" icon={CalendarIcon} active={activeView === 'calendar'} onClick={handleNavClick} collapsed={isCollapsed} />
-          <div className="my-2 border-t border-white/10"></div>
+          <div className="py-4"><div className="h-px bg-white/5 mx-2"></div></div>
           <NavItem id="clients" label="Clientes" icon={UsersIcon} active={activeView === 'clients'} onClick={handleNavClick} collapsed={isCollapsed} />
           <NavItem id="products" label="Catálogo" icon={PackageIcon} active={activeView === 'products'} onClick={handleNavClick} collapsed={isCollapsed} />
-          <NavItem id="pdf-customizer" label="Personalizar PDF" icon={FileEditIcon} active={activeView === 'pdf-customizer'} onClick={handleNavClick} collapsed={isCollapsed} />
-          <NavItem id="settings" label="Configuración" icon={SettingsIcon} active={activeView === 'settings'} onClick={handleNavClick} collapsed={isCollapsed} />
+          <NavItem id="pdf-customizer" label="Diseño PDF" icon={FileEditIcon} active={activeView === 'pdf-customizer'} onClick={handleNavClick} collapsed={isCollapsed} />
+          <NavItem id="settings" label="Ajustes" icon={SettingsIcon} active={activeView === 'settings'} onClick={handleNavClick} collapsed={isCollapsed} />
           
           {authService.isAdmin(user) && (
              <>
-             {!isCollapsed && <div className="pt-4 pb-2 border-t border-white/10 mt-4"><p className="px-4 text-[10px] font-bold text-white/40 uppercase">Administración</p></div>}
-             {isCollapsed && <div className="my-2 border-t border-white/10"></div>}
-             <NavItem id="admin-panel" label="Gestión Usuarios" icon={ShieldIcon} active={activeView === 'admin-panel'} onClick={handleNavClick} collapsed={isCollapsed} highlight={true} />
+             <div className="py-4"><div className="h-px bg-white/5 mx-2"></div></div>
+             <NavItem id="admin-panel" label="Seguridad" icon={ShieldIcon} active={activeView === 'admin-panel'} onClick={handleNavClick} collapsed={isCollapsed} highlight={true} />
              </>
           )}
         </nav>
 
-        <div className="p-4 border-t border-white/10 flex flex-col gap-2">
-          {/* Collapse Toggle */}
+        <div className="p-4 flex flex-col gap-2 bg-gradient-to-t from-black to-transparent">
           <button 
             onClick={() => setIsCollapsed(!isCollapsed)} 
-            className="hidden lg:flex items-center justify-center p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors"
-            title={isCollapsed ? "Expandir Menú" : "Colapsar Menú"}
+            className="hidden lg:flex items-center justify-center p-2.5 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"
           >
              {isCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
           </button>
 
-          <button onClick={onLogout} className={`w-full flex items-center justify-center space-x-2 p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors ${isCollapsed ? '' : ''}`}>
+          <button onClick={onLogout} className="w-full flex items-center justify-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-all border border-transparent hover:border-red-500/20">
              <LogOutIcon /> 
-             {!isCollapsed && <span className="text-xs font-bold uppercase">Cerrar Sesión</span>}
+             {!isCollapsed && <span className="text-[10px] font-black uppercase tracking-widest">Logout System</span>}
           </button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto relative bg-[var(--bg-main)] pt-16 lg:pt-0 transition-colors duration-500">
-        <div className="max-w-7xl mx-auto p-4 lg:p-8">
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-auto relative pt-16 lg:pt-0">
+        <div className="max-w-7xl mx-auto p-4 lg:p-10">
           {children}
         </div>
       </main>
