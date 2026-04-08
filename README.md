@@ -1,492 +1,322 @@
-Aquí tienes un README detallado y profesional para el repositorio:
+# PRESUPUESTOS- - Sistema de Gestión de Presupuestos Multi-ERP
 
----
+Una aplicación web moderna para la creación y gestión de presupuestos comerciales con soporte para múltiples sistemas ERP (Ágora y Sage). [1](#0-0) 
 
-# README propuesto para `PRESUPUESTOS-`
+## 🚀 Características Principales
 
-```markdown
-<div align="center">
+### Gestión de Presupuestos
+- Creación y edición de presupuestos con cálculo automático de totales, IVA e IRPF [2](#0-1) 
+- Generación de PDFs personalizados por sistema ERP [3](#0-2) 
+- Seguimiento de estados (pendiente, aceptado, rechazado)
+- Gestión de plazos de pago y vencimientos [4](#0-3) 
 
-# Gravity Manager
+### Multi-ERP
+- Soporte para Ágora, Sage 50, Sage 200 y Sage Despachos [5](#0-4) 
+- Configuración visual independiente para cada sistema
+- Filtrado de productos por sistema
 
-**Aplicación profesional de gestión comercial y presupuestos**
+### Gestión de Clientes y Productos
+- Base de datos de clientes con historial de presupuestos [6](#0-5) 
+- Catálogo de productos y kits/packs
+- Control de gastos para cálculo de rentabilidad
 
-![Version](https://img.shields.io/badge/version-2.1.0-blue)
-![React](https://img.shields.io/badge/React-19-61DAFB)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.2-3178C6)
-![Vite](https://img.shields.io/badge/Vite-5-646CFF)
-![Firebase](https://img.shields.io/badge/Firebase-10-FFCA28)
+### IA Integrada
+- Generación asistida de textos comerciales con IA [7](#0-6) 
+- Mejora de descripciones de productos
 
-</div>
+## 🏗️ Arquitectura
 
----
+### Patrón Local-First con Sincronización
+La aplicación utiliza un patrón "Dual-Write" donde los datos se guardan inmediatamente en localStorage para respuesta instantánea y luego se sincronizan con Firebase Firestore [8](#0-7) .
 
-## Descripcion
+### Estructura de Componentes
+- **BudgetEditor**: Editor principal de presupuestos
+- **ClientManager**: Gestión de clientes y su historial
+- **ProductManager**: Catálogo de productos
+- **PdfCustomizer**: Personalización de PDFs por sistema [9](#0-8) 
+- **Settings**: Configuración global de la aplicación [10](#0-9) 
 
-Gravity Manager (`proquote-manager`) es una Single Page Application (SPA) diseñada para equipos comerciales.
-Permite crear, gestionar y dar seguimiento a presupuestos profesionales, integrándose con
-múltiples contextos ERP (Ágora, Sage 50, Sage 200 y Sage Despachos).
+## 📦 Instalación
 
-Características principales:
-
-- **Local-first con sincronización en la nube** — Los datos se guardan en LocalStorage y se sincronizan
-  en tiempo real con Firebase Firestore.
-- **Generación de PDF profesional** — PDFs personalizables por sistema ERP con portada, tabla de
-  productos, condiciones legales, firmas y logos de partners.
-- **IA integrada (Google Gemini)** — Pulido automático de descripciones técnicas, generación de cartas
-  de presentación y redacción de emails comerciales.
-- **Multi-sistema ERP** — Branding, colores y filtrado de productos diferenciado para cada contexto
-  (`agora`, `sage`, `sage200`, `sagedespachos`).
-- **PWA-ready** — Configurada como Progressive Web App con soporte para instalación en dispositivos
-  móviles.
-
----
-
-## Stack Tecnológico
-
-| Categoría        | Tecnología                | Uso                                              |
-| :--------------- | :------------------------ | :----------------------------------------------- |
-| **Framework**    | React 19 + TypeScript 5   | Renderizado de UI y tipado estático               |
-| **Estilos**      | Tailwind CSS (CDN)        | Diseño responsive utility-first                   |
-| **Animaciones**  | Framer Motion             | Transiciones de vistas y feedback visual          |
-| **Persistencia** | Firebase Firestore + LocalStorage | Pipeline de sincronización dual-write     |
-| **IA**           | Google Gemini (`@google/genai`) | Generación de texto comercial             |
-| **PDF**          | jsPDF + jspdf-autotable   | Generación de documentos en el cliente            |
-| **Gráficos**     | Recharts                  | Visualización de datos en el dashboard            |
-| **Iconos**       | Lucide React              | Iconografía consistente                           |
-| **Build**        | Vite 5                    | Bundling y servidor de desarrollo                 |
-
----
-
-## Estructura del Proyecto
-
-```
-PRESUPUESTOS-/
-├── index.html              # Punto de entrada HTML (PWA manifest, Tailwind, importmap)
-├── index.tsx               # Bootstrap de React (ReactDOM.createRoot)
-├── App.tsx                 # Componente raíz — routing, estado global, notificaciones
-├── types.ts                # Modelo de datos completo (Budget, Client, Product, etc.)
-├── vite.config.ts          # Configuración de Vite
-├── package.json            # Dependencias y scripts
-├── components/
-│   ├── AdminPanel.tsx      # Panel de administración de usuarios
-│   ├── BudgetEditor.tsx    # Editor completo de presupuestos
-│   ├── CalendarView.tsx    # Vista de calendario de tareas
-│   ├── ClientManager.tsx   # CRUD de clientes
-│   ├── CommandPalette.tsx  # Paleta de comandos (Ctrl+K)
-│   ├── Dashboard.tsx       # Panel principal con métricas y gráficos
-│   ├── EmailTemplates.tsx  # Gestión de plantillas de email
-│   ├── ExpenseManager.tsx  # Gestión de gastos
-│   ├── Layout.tsx          # Shell de navegación lateral
-│   ├── Login.tsx           # Pantalla de autenticación
-│   ├── PdfCustomizer.tsx   # Personalización visual de PDFs por sistema
-│   ├── ProductManager.tsx  # CRUD de productos y kits
-│   ├── SearchableSelect.tsx # Componente de selección con búsqueda
-│   └── Settings.tsx        # Configuración general y perfil de empresa
-└── services/
-    ├── ai.ts               # Integración con Google Gemini (polish, intro, email)
-    ├── auth.ts             # Autenticación con SHA-256 y gestión de sesión
-    ├── pdfGenerator.ts     # Motor de generación de PDF con jsPDF
-    └── storage.ts          # Capa de persistencia LocalStorage + Firebase sync
-```
-
----
-
-## Requisitos Previos
-
-- **Node.js** (v18 o superior recomendado)
-- **npm** (incluido con Node.js)
-- **Clave API de Google Gemini** (opcional, para funcionalidades de IA)
-
----
-
-## Instalación y Ejecución
-
-### 1. Clonar el repositorio
-
-```bash
-git clone https://github.com/ibim4ster/PRESUPUESTOS-.git
-cd PRESUPUESTOS-
-```
-
-### 2. Instalar dependencias
-
+1. Clonar el repositorio
+2. Instalar dependencias:
 ```bash
 npm install
 ```
 
-### 3. Configurar la clave de API de Gemini (opcional)
+3. Configurar Firebase (opcional para modo local):
+   - Crear proyecto en Firebase Console
+   - Configurar credenciales en Settings [11](#0-10) 
 
-Crea un archivo `.env.local` en la raíz del proyecto:
-
-```env
-GEMINI_API_KEY=tu_clave_api_aqui
-```
-
-> Sin esta clave, la app funciona normalmente pero las funciones de IA (pulir descripciones,
-> generar cartas de presentación, redactar emails) devolverán el texto original o un fallback.
-
-### 4. Ejecutar en modo desarrollo
-
+4. Iniciar aplicación:
 ```bash
-npm run dev
+npm start
 ```
 
-### 5. Build de producción
+## 🔧 Configuración
 
-```bash
-npm run build
-npm run preview   # Para previsualizar el build
-```
+### Configuración de Empresa
+- Datos fiscales (CIF, dirección, etc.) [12](#0-11) 
+- Logo y preferencias visuales
 
-Los archivos compilados se generan en el directorio `dist/`.
+### Personalización de PDFs
+- Colores y branding por sistema ERP [13](#0-12) 
+- Cláusulas legales personalizadas [14](#0-13) 
+- Logos de partners en footer [15](#0-14) 
 
----
+## 🌐 Idioma
 
-## Credenciales por Defecto
+La aplicación utiliza terminología en español para alinearse con los sistemas ERP objetivo:
+- **Presupuesto**: Budget/Quote
+- **Cliente**: Client/Customer  
+- **Producto**: Product
+- **Gasto**: Expense
+- **Tarea**: Task [16](#0-15) 
 
-Al iniciar la aplicación por primera vez, se crea automáticamente un usuario administrador:
+## 🔐 Seguridad
 
-| Campo      | Valor   |
-| :--------- | :------ |
-| **Usuario** | `admin` |
-| **Contraseña** | `admin` |
+- Sistema de autenticación con rotación de contraseñas cada 15 días
+- Almacenamiento seguro de hashes de contraseñas
+- Sesiones gestionadas en sessionStorage
 
-> Se recomienda cambiar la contraseña inmediatamente tras el primer inicio de sesión.
+## 📊 Flujo de Trabajo
 
----
+1. **Configuración Inicial**: Datos de empresa y sistemas ERP
+2. **Gestión de Catálogo**: Carga de productos y clientes
+3. **Creación de Presupuestos**: Uso del editor con asistencia de IA
+4. **Generación de PDF**: Exportación con branding personalizado
+5. **Seguimiento**: Control de estados y plazos de pago
 
-## Modelo de Datos Principal
+## 🛠️ Tecnologías
 
-El archivo `types.ts` define todas las entidades del sistema:
-
-| Entidad          | Descripción                                                        |
-| :--------------- | :----------------------------------------------------------------- |
-| `Budget`         | Presupuesto completo con líneas, descuentos, impuestos y firmas    |
-| `Client`         | Ficha de cliente (nombre comercial, razón social, CIF, etc.)       |
-| `Product`        | Producto del catálogo con precio, coste, stock y sistema ERP       |
-| `ProductKit`     | Agrupación de productos como paquete comercial                     |
-| `LineItem`       | Línea individual de un presupuesto (producto o sección)            |
-| `Expense`        | Registro de gasto con categoría y recurrencia                      |
-| `Task`           | Tarea asignable con prioridad y relación a cliente/presupuesto     |
-| `User`           | Usuario del sistema con rol (`admin` / `commercial`) y tema visual |
-| `EmailTemplate`  | Plantilla de email con variables (`{{client}}`, `{{number}}`)      |
-| `CompanyProfile` | Perfil de la empresa emisora (logo, CIF, dirección, etc.)          |
-| `PdfConfig`      | Configuración visual del PDF por cada sistema ERP                  |
-
-### Estados de un Presupuesto
-
-Un presupuesto (`Budget`) puede estar en uno de estos estados:
-
-```
-draft → pending → accepted
-                → rejected (con motivo de rechazo)
-```
+- React con TypeScript
+- Firebase Firestore (sincronización)
+- jsPDF (generación de PDFs)
+- Tailwind CSS (estilos)
+- IA para generación de texto
 
 ---
 
-## Servicios (Capa de Lógica)
+## Notes
 
-### `storageService` (`services/storage.ts`)
+Este README está basado en la estructura y funcionalidades observadas en el códigobase. La aplicación está diseñada específicamente para el mercado español con integración con sistemas ERP locales como Ágora y Sage. El patrón local-first asegura funcionamiento offline con sincronización cuando hay conexión.
 
-Capa de persistencia **local-first** con sincronización bidireccional a Firebase:
-
-- **Escritura dual**: cada operación guarda en LocalStorage y luego empuja a Firestore.
-- **Listeners en tiempo real**: `onSnapshot` de Firestore actualiza el estado local automáticamente.
-- **Seed automático**: al primer inicio, crea el usuario admin por defecto.
-- **Export/Import**: permite exportar todos los datos a JSON e importarlos de vuelta.
-- **Test de conexión**: método `testConnection()` para verificar la conectividad con Firebase.
-
-### `authService` (`services/auth.ts`)
-
-- Hashing de contraseñas con **SHA-256** vía `crypto.subtle`.
-- Sesión almacenada en `sessionStorage` (expira al cerrar la pestaña).
-- El hash de la contraseña **no** se almacena en la sesión por seguridad.
-- Verificación de rol admin con `isAdmin()`.
-
-### `aiService` (`services/ai.ts`)
-
-Integración con **Google Gemini** (`gemini-3-flash-preview`):
-
-| Método              | Función                                                          |
-| :------------------ | :--------------------------------------------------------------- |
-| `polishDescription` | Mejora comercialmente una descripción técnica de producto         |
-| `generateIntro`     | Genera una carta de presentación personalizada para el cliente    |
-| `generateEmail`     | Redacta emails de envío o seguimiento (devuelve subject + body)   |
-| `getSalesAdvice`    | Devuelve un consejo motivacional (placeholder actual)             |
-
-### `generateBudgetPdf` (`services/pdfGenerator.ts`)
-
-Genera PDFs profesionales con:
-
-- **Portada** personalizable (título, subtítulo, logo, datos del cliente)
-- **Cabecera** con datos del emisor y receptor
-- **Texto de presentación** (generado opcionalmente por IA)
-- **Tabla de productos** con imágenes, descuentos y secciones
-- **Desglose financiero** (subtotal, descuentos, bonos, IVA, IRPF, total)
-- **Tabla de vencimientos** de pago
-- **Términos y condiciones** legales configurables
-- **Zona de firmas** con soporte para firma digital del cliente
-- **Logos de partners** en el pie de página
-- **Numeración de páginas**
-
----
-
-## Sistemas ERP Soportados
-
-La aplicación opera bajo un contexto `SystemType` que afecta al branding, colores del PDF y
-filtrado de productos:
-
-| Sistema          | Etiqueta                    | Color primario |
-| :--------------- | :-------------------------- | :------------- |
-| `agora`          | Ágora Restauración/Retail   | `#dc2626` (rojo) |
-| `sage`           | Sage 50                     | `#000000` (negro) |
-| `sage200`        | Sage 200                    | `#000000` (negro) |
-| `sagedespachos`  | Sage Despachos              | `#000000` (negro) |
-
-El cambio de sistema se realiza desde la barra de navegación y dispara una notificación sonora.
-
----
-
-## Funcionalidades Destacadas
-
-- **Command Palette** — Acceso rápido con `Ctrl+K` / `Cmd+K` para navegar y buscar presupuestos.
-- **Notificaciones con sonido** — Feedback auditivo generado con Web Audio API para acciones de
-  éxito, error y cambio de sistema.
-- **Temas visuales** — Cada usuario puede elegir entre `classic`, `ocean` y `midnight`.
-- **Metas mensuales** — Sistema de gamificación con objetivo mensual configurable por usuario.
-- **Versionado de presupuestos** — Soporte para `parentBudgetId` y `version` para rastrear
-  revisiones.
-- **Gestión de inventario** — Stock actual y nivel mínimo de alerta por producto.
-- **Productos recurrentes** — Marcado de productos con frecuencia mensual o anual.
-- **Registro de actividad** — Log de auditoría con las últimas 200 acciones del sistema.
-
----
-
-## Scripts Disponibles
-
-| Comando           | Descripción                                |
-| :---------------- | :----------------------------------------- |
-| `npm run dev`     | Inicia el servidor de desarrollo con Vite  |
-| `npm run build`   | Genera el build de producción en `dist/`   |
-| `npm run preview` | Previsualiza el build de producción        |
-
----
-
-## Licencia
-
-Proyecto privado. Consulta con el propietario del repositorio para términos de uso.
-```
-
----
-
-Este README cubre todos los aspectos del repositorio basándome en el código fuente real:
-
-- **Descripción general** del proyecto y sus capacidades [1](#0-0) 
-- **Stack tecnológico** completo con cada dependencia [2](#0-1) 
-- **Estructura de archivos** con la función de cada componente y servicio [3](#0-2) 
-- **Instrucciones de instalación** y ejecución [4](#0-3) 
-- **Credenciales por defecto** (admin/admin) creadas en el seed inicial [5](#0-4) 
-- **Modelo de datos** con todas las entidades definidas en `types.ts` [6](#0-5) 
-- **Servicios**: storage con sync Firebase [7](#0-6) , auth con SHA-256 [8](#0-7) , IA con Gemini [9](#0-8) , y generador de PDF [10](#0-9) 
-- **Sistemas ERP** soportados con sus etiquetas y colores [11](#0-10) 
-- **Funcionalidades** como Command Palette (`Ctrl+K`) [12](#0-11) , notificaciones sonoras [13](#0-12) , y configuración PWA [14](#0-13)
+Wiki pages you might want to explore:
+- [Settings & PDF Customizer (ibim4ster/PRESUPUESTOS-)](/wiki/ibim4ster/PRESUPUESTOS-#4.6)
+- [Glossary (ibim4ster/PRESUPUESTOS-)](/wiki/ibim4ster/PRESUPUESTOS-#7)
 
 ### Citations
 
-**File:** package.json (L2-6)
-```json
-{
-  "name": "proquote-manager",
-  "private": true,
-  "version": "2.1.0",
-  "type": "module",
+**File:** components/BudgetEditor.tsx (L515-521)
+```typescript
+                  <button 
+                    onClick={generateAiIntro} 
+                    disabled={isAiGenerating}
+                    className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-bold flex items-center gap-2 hover:bg-purple-200 transition-colors"
+                  >
+                      <SparklesIcon /> {isAiGenerating ? 'Redactando...' : 'Generar con IA'}
+                  </button>
 ```
 
-**File:** package.json (L12-29)
-```json
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "jspdf": "^2.5.1",
-    "jspdf-autotable": "^3.8.2",
-    "firebase": "^10.8.0",
-    "recharts": "^2.12.0",
-    "framer-motion": "^11.11.17",
-    "lucide-react": "^0.460.0",
-    "@google/genai": "^1.2.0"
-  },
-  "devDependencies": {
-    "@types/react": "^18.2.66",
-    "@types/react-dom": "^18.2.22",
-    "@vitejs/plugin-react": "^4.2.1",
-    "typescript": "^5.2.2",
-    "vite": "^5.2.0"
+**File:** components/BudgetEditor.tsx (L598-614)
+```typescript
+                             </div>
+                             <div className="flex justify-between text-xs">
+                                 <span className="text-gray-400">Base Imponible</span>
+                                 <span className="font-mono">{taxableBase.toFixed(2)} €</span>
+                             </div>
+                             <div className="h-px bg-gray-600 my-2"></div>
+                             <div className="flex justify-between items-center">
+                                 <span className="text-xs font-bold uppercase text-gray-300">Beneficio Neto</span>
+                                 <span className={`font-mono font-bold text-lg ${netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>{netProfit.toFixed(2)} €</span>
+                             </div>
+                             <div className="bg-gray-900 rounded-lg p-2 flex items-center justify-between border border-gray-700">
+                                 <span className="text-xs font-bold text-gray-400">Margen Comercial</span>
+                                 <span className={`text-sm font-bold px-2 py-0.5 rounded ${marginBg} ${marginColor}`}>
+                                     {marginPercentage.toFixed(2)}%
+                                 </span>
+                             </div>
+                        </div>
+```
+
+**File:** components/BudgetEditor.tsx (L620-642)
+```typescript
+                {/* Payment Terms Widget (NEW) */}
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <h4 className="font-bold text-slate-800 mb-3 text-sm flex items-center gap-2"><CalendarIcon /> Vencimientos / Plazos de Pago</h4>
+                    <div className="space-y-2 mb-3">
+                        {(budget.paymentTerms || []).map((term) => (
+                            <div key={term.id} className="flex gap-2 items-center text-xs">
+                                <input className="flex-1 border border-gray-300 rounded p-1.5 bg-white text-slate-800" value={term.concept} onChange={e => updatePaymentTerm(term.id, 'concept', e.target.value)} placeholder="Concepto (ej: Firma)" />
+                                <div className="w-16 relative">
+                                    <input className="w-full border border-gray-300 rounded p-1.5 bg-white text-slate-800 text-right pr-4" type="number" value={term.percentage} onChange={e => updatePaymentTerm(term.id, 'percentage', parseFloat(e.target.value))} />
+                                    <span className="absolute right-1 top-1.5 text-gray-400">%</span>
+                                </div>
+                                <div className="w-20 relative">
+                                    <input className="w-full border border-gray-300 rounded p-1.5 bg-gray-50 text-slate-500 text-right pr-4" type="number" value={term.amount.toFixed(2)} readOnly />
+                                    <span className="absolute right-1 top-1.5 text-gray-400">€</span>
+                                </div>
+                                <input type="date" className="w-24 border border-gray-300 rounded p-1.5 bg-white text-slate-800" value={term.date || ''} onChange={e => updatePaymentTerm(term.id, 'date', e.target.value)} />
+                                <button onClick={() => removePaymentTerm(term.id)} className="text-slate-400 hover:text-red-500"><XIcon /></button>
+                            </div>
+                        ))}
+                        {(budget.paymentTerms || []).length === 0 && <div className="text-xs text-gray-400 italic text-center py-2 bg-gray-50 rounded">Pago único por defecto</div>}
+                    </div>
+                    <button onClick={handleAddPaymentTerm} className="w-full py-1.5 text-xs font-bold text-slate-600 bg-gray-100 hover:bg-gray-200 rounded border border-gray-200 dashed">+ Añadir Plazo</button>
+                </div>
+```
+
+**File:** services/pdfGenerator.ts (L307-340)
+```typescript
+  if (config.showLegal) {
+      if (finalY > pageHeight - 80) { doc.addPage(); finalY = 20; }
+      doc.setFontSize(8); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]); doc.setFont('helvetica', 'bold'); doc.text("TÉRMINOS Y CONDICIONES", 15, finalY);
+      finalY += 5;
+      doc.setTextColor(80); doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+      let legalText = company.terms + "\n";
+      config.legalTextIds.forEach(id => { const t = DEFAULT_LEGAL_TEXTS.find(lt => lt.id === id); if (t) legalText += `• ${t.text}\n`; });
+      if (config.customLegalTexts) config.customLegalTexts.forEach(clt => { if (clt.active) legalText += `• ${clt.text}\n`; });
+      const splitLegal = doc.splitTextToSize(legalText, pageWidth - 30);
+      doc.text(splitLegal, 15, finalY);
+      finalY += (splitLegal.length * 3) + 10;
+  } else { finalY += 20; }
+
+  if (config.showSignatures) {
+      if (finalY > pageHeight - 50) { doc.addPage(); finalY = 40; }
+      const boxW = 80; const boxH = 35;
+      doc.setDrawColor(200); doc.setLineWidth(0.1);
+      doc.rect(15, finalY, boxW, boxH);
+      doc.setFontSize(7); doc.setTextColor(150); doc.text("Firma y Sello de la Empresa", 17, finalY + 4);
+      const clientBoxX = pageWidth - 15 - boxW;
+      doc.rect(clientBoxX, finalY, boxW, boxH);
+      doc.text("Aceptación del Cliente", clientBoxX + 2, finalY + 4);
+      if (budget.clientSignature) { try { doc.addImage(budget.clientSignature, 'PNG', clientBoxX + 10, finalY + 5, boxW - 20, boxH - 10); } catch(e) {} }
   }
+
+  const footerY = pageHeight - 15;
+  const logoH = 10;
+  const activeLogos = Object.values(config.partnerLogos).filter(l => !!l && l.length > 0);
+  if (activeLogos.length > 0) {
+      const gap = 5; const w = 20;
+      let startX = (pageWidth - (activeLogos.length * w) - ((activeLogos.length - 1) * gap)) / 2;
+      activeLogos.forEach(logo => { if (logo) { try { doc.addImage(logo, 'PNG', startX, footerY - 5, w, logoH, undefined, 'FAST'); startX += w + gap; } catch (e) {} } });
+  }
+  if (config.footerText) { doc.setFontSize(7); doc.setTextColor(150); doc.text(config.footerText, pageWidth / 2, pageHeight - 20, { align: 'center' }); }
 ```
 
-**File:** App.tsx (L2-18)
+**File:** services/storage.ts (L46-51)
 ```typescript
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Layout } from './components/Layout';
-import { Dashboard } from './components/Dashboard';
-import { ClientManager } from './components/ClientManager';
-import { ProductManager } from './components/ProductManager';
-import { Settings } from './components/Settings';
-import { BudgetEditor } from './components/BudgetEditor';
-import { PdfCustomizer } from './components/PdfCustomizer';
-import { Login } from './components/Login';
-import { AdminPanel } from './components/AdminPanel';
-import { ExpenseManager } from './components/ExpenseManager';
-import { CalendarView } from './components/CalendarView';
-import { CommandPalette } from './components/CommandPalette';
-import { Budget, SystemType, User } from './types';
-import { storageService } from './services/storage';
-import { authService } from './services/auth';
+const DEFAULT_PDF_CONFIG: PdfConfig = {
+    agora: { ...DEFAULT_SYSTEM_CONFIG, primaryColor: '#dc2626', secondaryColor: '#f8fafc', partnerLogos: { slot1: LOGO_AGORA, slot2: LOGO_CONCORD, slot3: LOGO_CASHLOGY } },
+    sage: { ...DEFAULT_SYSTEM_CONFIG, primaryColor: '#000000', secondaryColor: '#e6ffef', partnerLogos: {} },
+    sage200: { ...DEFAULT_SYSTEM_CONFIG, primaryColor: '#000000', secondaryColor: '#e6ffef', partnerLogos: {} },
+    sagedespachos: { ...DEFAULT_SYSTEM_CONFIG, primaryColor: '#000000', secondaryColor: '#e6ffef', partnerLogos: {} }
+};
 ```
 
-**File:** App.tsx (L59-65)
+**File:** services/storage.ts (L127-127)
 ```typescript
-  useEffect(() => {
-      const handleKeyDown = (e: KeyboardEvent) => {
-          if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setIsCmdOpen(prev => !prev); }
-      };
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-```
-
-**File:** App.tsx (L67-89)
-```typescript
-  const playNotificationSound = (type: 'success' | 'error' | 'system' = 'system') => {
-      try {
-          const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-          if (!AudioContext) return;
-          const ctx = new AudioContext();
-          const now = ctx.currentTime;
-          const gain = ctx.createGain();
-          gain.connect(ctx.destination);
-          if (type === 'error') {
-              const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.setValueAtTime(150, now); osc.frequency.linearRampToValueAtTime(100, now + 0.1);
-              gain.gain.setValueAtTime(0.05, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-              osc.connect(gain); osc.start(now); osc.stop(now + 0.15);
-          } else if (type === 'success') {
-              const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.setValueAtTime(1200, now);
-              gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.03, now + 0.02); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-              osc.connect(gain); osc.start(now); osc.stop(now + 0.4);
-          } else {
-              const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.setValueAtTime(750, now);
-              gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.04, now + 0.005); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-              osc.connect(gain); osc.start(now); osc.stop(now + 0.1);
-          }
-      } catch(e) {}
-  };
-```
-
-**File:** App.tsx (L117-117)
-```typescript
-  const systemLabels = { agora: 'Ágora Restauración/Retail', sage: 'Sage 50', sage200: 'Sage 200', sagedespachos: 'Sage Despachos' };
-```
-
-**File:** README.md (L11-20)
-```markdown
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
-```
-
-**File:** services/storage.ts (L126-131)
-```typescript
-export const storageService = {
   subscribe: (listener: Listener) => { listeners.push(listener); return () => { const idx = listeners.indexOf(listener); if (idx > -1) listeners.splice(idx, 1); }; },
-  checkAndSeedData: async () => {
-    const initVersion = localStorage.getItem(KEYS.INIT);
-    initFirebase();
-    if (initVersion !== KEYS.INIT) { localStorage.setItem(KEYS.INIT, KEYS.INIT); }
 ```
 
-**File:** services/storage.ts (L132-143)
+**File:** components/ClientManager.tsx (L371-387)
 ```typescript
-    const users = loadLocal<User[]>(KEYS.USERS, []);
-    if (users.length === 0) {
-        // ACTUALIZACIÓN: Contraseña inicial 'admin'
-        const adminHash = await authService.hashPassword('admin');
-        const adminUser: User = {
-            id: 'admin-001', username: 'admin', name: 'Super Administrator', role: 'admin',
-            passwordHash: adminHash, createdAt: new Date().toISOString(), lastPasswordChange: new Date().toISOString()
-        };
-        saveLocal(KEYS.USERS, [adminUser]);
-        pushToCloud('users', adminUser);
-        notify();
-    }
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <div>
+                              <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><FileTextIcon /> Historial de Presupuestos</h4>
+                              <div className="space-y-3">
+                                  {clientBudgets.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(b => (
+                                      <div key={b.id} className="flex justify-between items-center p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
+                                          <div>
+                                              <div className="font-bold text-sm text-slate-800">{b.number}</div>
+                                              <div className="text-xs text-slate-500">{new Date(b.createdAt).toLocaleDateString()}</div>
+                                          </div>
+                                          <div className="text-right">
+                                              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${b.status === 'accepted' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>{b.status}</span>
+                                          </div>
+                                      </div>
+                                  ))}
+                                  {clientBudgets.length === 0 && <p className="text-slate-400 text-sm italic">Sin historial.</p>}
+                              </div>
 ```
 
-**File:** types.ts (L2-5)
+**File:** components/PdfCustomizer.tsx (L115-121)
 ```typescript
-export type SystemType = 'agora' | 'sage' | 'sage200' | 'sagedespachos';
-
-export type UserRole = 'admin' | 'commercial';
-export type AppTheme = 'classic' | 'ocean' | 'midnight'; // New Theme Type
+      <div className="bg-slate-200 p-1 rounded-lg w-full max-w-2xl mx-auto flex overflow-x-auto">
+          {(['agora', 'sage', 'sage200', 'sagedespachos'] as SystemType[]).map(sys => (
+             <button key={sys} onClick={() => setActiveTab(sys)} className={`flex-1 py-2 px-3 text-xs md:text-sm font-bold rounded-md transition-all whitespace-nowrap ${activeTab === sys ? sys === 'agora' ? 'bg-red-600 text-white shadow' : 'bg-[#00d061] text-black shadow' : 'text-slate-600 hover:text-slate-800'}`}>
+                {labels[sys]}
+             </button>
+          ))}
+      </div>
 ```
 
-**File:** services/auth.ts (L4-11)
+**File:** components/PdfCustomizer.tsx (L129-132)
 ```typescript
-export const authService = {
-  // Helper to hash password using SHA-256
-  hashPassword: async (password: string): Promise<string> => {
-    const msgBuffer = new TextEncoder().encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  },
+                 <div><label className="block text-xs font-bold text-slate-500 mb-1">Color Principal</label><div className="flex items-center gap-2"><input type="color" className="h-10 w-full rounded border-gray-200 cursor-pointer" value={currentConfig.primaryColor} onChange={e => updateCurrentConfig({ primaryColor: e.target.value})} /></div></div>
+                 <div><label className="block text-xs font-bold text-slate-500 mb-1">Color Secundario</label><div className="flex items-center gap-2"><input type="color" className="h-10 w-full rounded border-gray-200 cursor-pointer" value={currentConfig.secondaryColor} onChange={e => updateCurrentConfig({ secondaryColor: e.target.value})} /></div></div>
+                 <div className="mt-6 border-t pt-4"><label className="block text-xs font-bold text-slate-500 mb-1">Texto del Título (Header)</label><input className="w-full border border-gray-300 rounded text-sm p-2 bg-white text-slate-900" value={currentConfig.titleText} onChange={e => updateCurrentConfig({ titleText: e.target.value})} /></div>
+              </div>
 ```
 
-**File:** services/ai.ts (L4-20)
+**File:** components/PdfCustomizer.tsx (L175-178)
 ```typescript
-export const aiService = {
-    isAvailable: () => !!process.env.API_KEY,
-
-    polishDescription: async (text: string): Promise<string> => {
-        if (!process.env.API_KEY) return text;
-        try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            const response = await ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
-                contents: `Mejora comercialmente esta descripción técnica de un producto para un presupuesto profesional. Mantenlo conciso pero atractivo. Texto original: "${text}"`,
-            });
-            return response.text || text;
-        } catch (error) {
-            console.error("AI polish error:", error);
-            return text;
-        }
-    },
+           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full">
+              <h3 className="font-bold text-slate-800 mb-4 border-b pb-2">Cláusulas Legales ({labels[activeTab]})</h3>
+              <div className="mb-6"><p className="text-xs text-slate-500 mb-2 font-bold uppercase">Textos por Defecto</p><div className="space-y-2">{DEFAULT_LEGAL_TEXTS.map(txt => (<label key={txt.id} className="flex items-start gap-2 p-2 hover:bg-gray-50 rounded border border-transparent hover:border-gray-100 cursor-pointer transition-colors"><input type="checkbox" checked={currentConfig.legalTextIds.includes(txt.id)} onChange={e => toggleLegalDefault(txt.id, e.target.checked)} className="mt-1 rounded text-accent w-4 h-4 flex-shrink-0"/><span className="text-xs text-slate-700 leading-relaxed">{txt.text}</span></label>))}</div></div>
+              <div className="mb-6"><p className="text-xs text-slate-500 mb-2 font-bold uppercase">Cláusulas Personalizadas</p><div className="flex gap-2 mb-3"><input className="flex-1 border border-gray-300 rounded text-sm p-2 bg-white text-slate-900 focus:ring-2 focus:ring-accent outline-none" placeholder="Escribe una nueva cláusula..." value={newClause} onChange={(e) => setNewClause(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleAddCustomClause(); }}/><button onClick={handleAddCustomClause} className="bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded text-slate-700 text-lg font-bold transition-colors">+</button></div><div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">{(currentConfig.customLegalTexts || []).map(txt => (<div key={txt.id} className ... (truncated)
 ```
 
-**File:** services/pdfGenerator.ts (L6-11)
+**File:** components/PdfCustomizer.tsx (L184-192)
 ```typescript
-export const generateBudgetPdf = (
-  budget: Budget,
-  company: CompanyProfile,
-  fullConfig: PdfConfig
-) => {
-  const doc = new jsPDF();
+           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full">
+              <h3 className="font-bold text-slate-800 mb-4 border-b pb-2">Logos Footer ({labels[activeTab]})</h3>
+              <div className="space-y-6">
+                 {['slot1', 'slot2', 'slot3'].map((p, index) => {
+                   let label = `Logo ${index + 1}`;
+                   if(activeTab === 'agora') { if(index === 0) label = "Logo Ágora"; if(index === 1) label = "Logo Concord"; if(index === 2) label = "Logo Cashlogy"; } else { label = `Logo ${labels[activeTab]} Partner ${index + 1}`; }
+                   return (<div key={p}><label className="block text-xs font-bold uppercase mb-2 text-slate-500 tracking-wider">{label}</label><div className="border-2 border-dashed border-gray-200 rounded-lg p-4 flex flex-col items-center gap-3 bg-gray-50 hover:bg-gray-100 transition-colors relative group"><div className="h-12 flex items-center justify-center overflow-hidden w-full">{/* @ts-ignore */}{currentConfig.partnerLogos[p as keyof typeof currentConfig.partnerLogos] ? /* @ts-ignore */<img src={currentConfig.partnerLogos[p as keyof typeof currentConfig.partnerLogos]} className="max-h-full max-w-full object-contain" /> : <span className="text-xs text-gray-300">Sin logo</span>}</div><div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg- ... (truncated)
+                 })}
+              </div>
 ```
 
-**File:** index.html (L9-15)
-```html
-    <!-- PWA Settings -->
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#0f172a">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Gravity">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2910/2910768.png">
+**File:** components/Settings.tsx (L215-237)
+```typescript
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div>
+                             <label className="block text-xs font-bold text-slate-500 mb-1">API Key</label>
+                             <input className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900 font-mono text-xs" 
+                                placeholder="AIzaSy..." 
+                                value={cloud.apiKey} onChange={e => setCloud({...cloud, apiKey: e.target.value})} 
+                             />
+                         </div>
+                         <div>
+                             <label className="block text-xs font-bold text-slate-500 mb-1">Auth Domain</label>
+                             <input className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900 font-mono text-xs" 
+                                placeholder="proyecto.firebaseapp.com" 
+                                value={cloud.authDomain} onChange={e => setCloud({...cloud, authDomain: e.target.value})} 
+                             />
+                         </div>
+                         <div>
+                             <label className="block text-xs font-bold text-slate-500 mb-1">Project ID</label>
+                             <input className="w-full bg-white border border-gray-300 p-2 rounded text-slate-900 font-mono text-xs" 
+                                placeholder="proyecto-id" 
+                                value={cloud.projectId} onChange={e => setCloud({...cloud, projectId: e.target.value})} 
+                             />
+                         </div>
+                     </div>
+```
+
+**File:** components/Settings.tsx (L256-265)
+```typescript
+      {/* Company Data */}
+      <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div className="flex justify-between items-center mb-4 border-b pb-2">
+            <h3 className="text-lg font-bold text-slate-800">Datos Fiscales de la Empresa</h3>
+            <button onClick={handleSaveCompany} className="bg-slate-900 text-white px-4 py-2 rounded text-sm font-medium hover:bg-slate-700">
+              Guardar Cambios
+            </button>
+        </div>
+        
+        <div className="flex flex-col md:flex-row gap-6">
 ```
